@@ -8,7 +8,6 @@ import logging
 import time
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 WIDTH = 1280
 HEIGHT = 720    
@@ -125,12 +124,6 @@ class Specie:
         pass
 
 
-Neurons = {
-    "INPUT": [(500, 180), (500, 280), (500, 380), (500, 480)], 
-    "HIDDEN": [(600, 230), (600, 330), (600, 430), (700, 230), (700, 330), (700, 430)],
-    "OUTPUT": [(800, 280),(800, 380)]
-}
-
 Connections = [
     [(520, 180), (580, 230)],
     [(520, 180), (580, 330)],
@@ -156,14 +149,14 @@ Connections = [
 ]
 
 
-def draw_neuron(position, type):
+def draw_neuron(position, type, radius):
     global screen
     if type == "HIDDEN":
-        pygame.draw.circle(screen, HIDDEN_COLOR, position, 20)
+        pygame.draw.circle(screen, HIDDEN_COLOR, position, radius)
     elif type == "OUTPUT":
-        pygame.draw.circle(screen, OUTPUT_COLOR, position, 20, 2)
+        pygame.draw.circle(screen, OUTPUT_COLOR, position, radius, 2)
     else:
-        pygame.draw.circle(screen, INPUT_COLOR, position, 20, 2)
+        pygame.draw.circle(screen, INPUT_COLOR, position, radius, 2)
 
 def draw_connection(position1, position2):
     global screen
@@ -265,6 +258,8 @@ class Brain:
 
         self.__connection_list = generate_initial_connection_list(total_connections, input_neurons, hidden_neurons, output_neurons)
 
+        self.__layers = {}
+
         neuron_numbers = [(neuron.get_id(), neuron.get_type()) for neuron in self.__neuron_list]
         logger.debug(f"Neuron numbers/type: {neuron_numbers}")
     
@@ -280,20 +275,12 @@ class Brain:
                 layers[str(connection_ids[1])] = layers[str(connection_ids[0])] + 1
             else:
                 layers[str(connection_ids[1])] = max(layers[str(connection_ids[0])] + 1, layers[str(connection_ids[1])])
-        logger.debug(f"Debug connections: {connection_ids_list}")
-        logger.debug(f"Debug set layers: {layers}")
         for neuron in self.__neuron_list:
             neuron_id = str(neuron.get_id())
             if not neuron_id == '0':
                 neuron.set_layer(layers[neuron_id])
     
     def get_layers(self):
-        # layers = {}
-        # for neuron in self.__neuron_list:
-        #     neuron_id = str(neuron.get_id())
-        #     if not neuron_id == '0':
-        #         layers[neuron_id] = neuron.get_layer()
-        # return layers
         layers = {}
         for neuron in self.__neuron_list:
             neuron_id = neuron.get_id()
@@ -304,14 +291,46 @@ class Brain:
                     layers[neuron_layer].append(neuron_id)
                 else:
                     layers[neuron_layer].append(neuron_id)
-        return layers
+        self.__layers = dict(sorted(layers.items()))
+        return dict(sorted(layers.items()))
     
     def draw_network(self):
-        for key in Neurons:
-            for position in Neurons[key]:
-                draw_neuron(position, key)
-        for connection in Connections:
-            draw_connection(connection[0], connection[1])
+        start_x = 340
+        start_y = 60
+        c_width = 600
+        c_height = 600
+
+        n_radius = 20
+        container_w = 60
+
+        neuron_position = {}
+        layer_values = list(self.__layers.values())
+
+        x_align = (c_width - (container_w * len(self.__layers))) / (len(self.__layers) + 1)
+        # pygame.draw.rect(screen, (255, 255, 0), (start_x, start_y, c_width, c_height), 3)
+        for layer_num in range(len(self.__layers)):
+            # pygame.draw.rect(screen, (255, 255, 255), (start_x + x_align * (layer_num + 1) + container_w * layer_num, start_y, container_w, c_height), 3)
+            y_align = (c_height - (n_radius * len(layer_values[layer_num]))) / (len(layer_values[layer_num]) + 1)
+            for neuron_num in range(len(layer_values[layer_num])):
+                pos_x = start_x + container_w/2 + x_align * (layer_num + 1) + container_w * layer_num
+                pos_y = start_y + n_radius/2 + y_align * (neuron_num + 1) + n_radius * neuron_num
+
+                neuron_position[layer_values[layer_num][neuron_num]] = (pos_x, pos_y)
+
+                if layer_num == 0:
+                    neuron_type = "INPUT"
+                elif layer_num == len(self.__layers) - 1:
+                    neuron_type = "OUTPUT"
+                else:
+                    neuron_type = "HIDDEN"
+
+                draw_neuron((pos_x, pos_y), neuron_type, n_radius)
+
+        for connection in self.__connection_list:
+            connection_id = connection.get_ids()
+            n1_pos = neuron_position[connection_id[0]]
+            n2_pos = neuron_position[connection_id[1]]
+            draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]))
 
     def get_neuron_list(self) -> list[Neuron]:
         return self.__neuron_list
@@ -326,8 +345,7 @@ def main(brain):
 
     brain.set_layers()
     brain_layers = brain.get_layers()
-    logger.debug(f"Layers: {brain_layers}")
-    logger.debug(f"Total layers: {len(brain_layers)}")
+    logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
 
     while running:
         clock.tick(60)
@@ -343,8 +361,8 @@ def main(brain):
 
 if __name__ == '__main__':
     running = True
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s | %(levelname)s | %(message)s")
-    my_brain = Brain(2, 2, 1, 100)
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
+    my_brain = Brain(7, 3, 5, 100)
     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
     screen = pygame.display.set_mode([WIDTH, HEIGHT], RESIZABLE)
     main(my_brain)
