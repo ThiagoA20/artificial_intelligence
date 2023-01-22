@@ -3,6 +3,7 @@ cycler==0.11.0
 fonttools==4.38.0
 kiwisolver==1.4.4
 matplotlib==3.6.3
+mplfinance==0.12.9b7
 numpy==1.24.1
 packaging==23.0
 pandas==1.5.3

@@ -102,6 +102,9 @@ class Connection:
     def get_info(self) -> dict:
         return {"innovation number": self.__innovation_id, "in neuron": self.__in_neuron, "out neuron": self.__out_neuron, "weight": self.__weight, "active": self.__active, "recurrent": self.__is_Recurrent}
     
+    def get_ids(self) -> tuple:
+        return (self.__in_neuron, self.__out_neuron)
+    
     def get_weight(self) -> float:
         return self.__weight
     
@@ -121,110 +124,6 @@ class Specie:
     def __init__(self):
         pass
 
-
-class Brain:
-    def __init__(self, input_neurons: int = INPUT_NEURONS, hidden_neurons: int = HIDDEN_NEURONS, output_neurons: int = OUTPUT_NEURONS, connections_percentage: int = CONNECTIONS_PERCENTAGE):
-        """Set the innovation number"""
-        logger.debug(f"NN info: ipn = {input_neurons}; hn = {hidden_neurons}; opn = {output_neurons}; ic% = {connections_percentage}")
-        global GENOME_HASHTABLE
-        global INNOVATION_NUM
-        self.__neuron_list = []
-        neuron_counter = 0
-        total_neurons = input_neurons + output_neurons + hidden_neurons + 1
-        while neuron_counter < total_neurons:
-            if neuron_counter == 0:
-                self.__neuron_list.append(Neuron(neuron_counter, 3, 0))
-            else:
-                if neuron_counter <= input_neurons:
-                    self.__neuron_list.append(Neuron(neuron_counter, 1, 0))
-                elif neuron_counter <= input_neurons + output_neurons:
-                    self.__neuron_list.append(Neuron(neuron_counter, 2, 2))
-                else:
-                    self.__neuron_list.append(Neuron(neuron_counter, 0, 1))
-            neuron_counter += 1
-        self.__connection_list = []
-        real_connections = lambda x: math.ceil(x * connections_percentage/100)
-        if hidden_neurons > 0:
-            connection_amount = (input_neurons * hidden_neurons) + (hidden_neurons * output_neurons)
-        else:
-            connection_amount = (input_neurons * output_neurons)
-        total_connections = real_connections(connection_amount)
-        while total_connections > 0:
-            logger.debug(f"Total connections: {total_connections}")
-            if hidden_neurons == 0:
-                for opn in range(1, output_neurons + 1):
-                    for ipn in range(1, input_neurons + 1):
-                        if f"{ipn}|{input_neurons + opn}" in GENOME_HASHTABLE:
-                            self.__connection_list.append(Connection(GENOME_HASHTABLE[f"{ipn}|{input_neurons + opn}"], ipn, input_neurons + opn, random.uniform(-20, 20)))
-                            total_connections -= 1
-                        else:
-                            INNOVATION_NUM += 1
-                            GENOME_HASHTABLE[f"{ipn}|{input_neurons + opn}"] = INNOVATION_NUM
-                            self.__connection_list.append(Connection(GENOME_HASHTABLE[f"{ipn}|{input_neurons + opn}"], ipn, input_neurons + opn, random.uniform(-20, 20)))
-                            total_connections -= 1
-                        if total_connections == 0:
-                            break
-                    if total_connections == 0:
-                            break
-            else:
-                for hn in range(1, hidden_neurons + 1):
-                    for ipn in range(1, input_neurons + 1):
-                        if f"{ipn}|{input_neurons + hn}" in GENOME_HASHTABLE:
-                            self.__connection_list.append(Connection(GENOME_HASHTABLE[f"{ipn}|{input_neurons + hn}"], ipn, input_neurons + hn, random.uniform(-20, 20)))
-                            total_connections -= 1
-                        else:
-                            INNOVATION_NUM += 1
-                            GENOME_HASHTABLE[f"{ipn}|{input_neurons + hn}"] = INNOVATION_NUM
-                            self.__connection_list.append(Connection(GENOME_HASHTABLE[f"{ipn}|{input_neurons + hn}"], ipn, input_neurons + hn, random.uniform(-20, 20)))
-                            total_connections -= 1
-                        if total_connections == 0:
-                            break
-                    for opn in range(1, output_neurons + 1):
-                        if f"{hn}|{input_neurons + hidden_neurons + opn}" in GENOME_HASHTABLE:
-                            self.__connection_list.append(Connection(GENOME_HASHTABLE[f"{hn}|{input_neurons + hidden_neurons + opn}"], hn, input_neurons + hidden_neurons + opn, random.uniform(-20, 20)))
-                            total_connections -= 1
-                        else:
-                            INNOVATION_NUM += 1
-                            GENOME_HASHTABLE[f"{hn}|{input_neurons + hidden_neurons + opn}"] = INNOVATION_NUM
-                            self.__connection_list.append(Connection(GENOME_HASHTABLE[f"{hn}|{input_neurons + hidden_neurons + opn}"], hn, input_neurons + hidden_neurons + opn, random.uniform(-20, 20)))
-                            total_connections -= 1
-                        if total_connections == 0:
-                            break
-                    if total_connections == 0:
-                        break
-        neuron_numbers = [(neuron.get_id(), neuron.get_type()) for neuron in self.__neuron_list]
-        logger.debug(f"Neuron numbers/type: {neuron_numbers}")
-    
-    def set_layers(self): 
-        layers = {}
-        input_list = []
-        output_list = []
-        for connection in self.__connection_list:
-            neuron_ids = connection.get_ids()
-            input_list.append(neuron_ids[0])
-            output_list.append(neuron_ids[1])
-    
-    def draw_network(self):
-        pass
-
-    def get_neuron_list(self) -> list[Neuron]:
-        return self.__neuron_list
-    
-    def get_connection_list(self) -> list[Connection]:
-        return self.__connection_list
-
-def draw_neuron(position, type):
-    global screen
-    if type == "HIDDEN":
-        pygame.draw.circle(screen, HIDDEN_COLOR, position, 20)
-    elif type == "OUTPUT":
-        pygame.draw.circle(screen, OUTPUT_COLOR, position, 20, 2)
-    else:
-        pygame.draw.circle(screen, INPUT_COLOR, position, 20, 2)
-
-def draw_connection(position1, position2):
-    global screen
-    pygame.draw.line(screen, (150, 150, 150), position1, position2)
 
 Neurons = {
     "INPUT": [(500, 180), (500, 280), (500, 380), (500, 480)], 
@@ -257,9 +156,178 @@ Connections = [
 ]
 
 
+def draw_neuron(position, type):
+    global screen
+    if type == "HIDDEN":
+        pygame.draw.circle(screen, HIDDEN_COLOR, position, 20)
+    elif type == "OUTPUT":
+        pygame.draw.circle(screen, OUTPUT_COLOR, position, 20, 2)
+    else:
+        pygame.draw.circle(screen, INPUT_COLOR, position, 20, 2)
+
+def draw_connection(position1, position2):
+    global screen
+    pygame.draw.line(screen, (150, 150, 150), position1, position2)
+
+
+def calculate_initial_connections(ipn_amount, hd_amount, opt_amount, ic_percentage):
+    real_connections = lambda x: math.ceil(x * ic_percentage/100)
+    if hd_amount > 0:
+        connection_amount = (ipn_amount * hd_amount) + (hd_amount * opt_amount)
+    else:
+        connection_amount = (ipn_amount * opt_amount)
+    return real_connections(connection_amount)
+
+
+def generate_initial_neuron_list(ipn_amount, hd_amount, opt_amount):
+    neuron_list = []
+    neuron_counter = 0
+    total_neurons = ipn_amount + opt_amount + hd_amount + 1
+    while neuron_counter < total_neurons:
+        if neuron_counter == 0:
+            neuron_list.append(Neuron(neuron_counter, 3, 1))
+        else:
+            if neuron_counter <= ipn_amount:
+                neuron_list.append(Neuron(neuron_counter, 1, 1))
+            elif neuron_counter <= ipn_amount + opt_amount:
+                if not hd_amount == 0:
+                    neuron_list.append(Neuron(neuron_counter, 2, 3))
+                else:
+                    neuron_list.append(Neuron(neuron_counter, 2, 2))
+            else:
+                neuron_list.append(Neuron(neuron_counter, 0, 2))
+        neuron_counter += 1
+    return neuron_list
+
+
+def generate_initial_connection_list(total_connections: int, ipn_amount: int, hn_amount: int, opn_amount: int):
+    global GENOME_HASHTABLE, INNOVATION_NUM
+
+    connection_list = []
+    hn_start = 1 + ipn_amount + opn_amount
+    opn_start = 1 + ipn_amount
+    while total_connections > 0:
+            if hn_amount == 0:
+                for ipn in range(1, ipn_amount + 1):
+                    for opn in range(opn_start, opn_start + opn_amount):
+                        if f"{ipn}|{opn}" in GENOME_HASHTABLE:
+                            connection_list.append(Connection(GENOME_HASHTABLE[f"{ipn}|{opn}"], ipn, opn, random.uniform(-20, 20)))
+                            total_connections -= 1
+                        else:
+                            INNOVATION_NUM += 1
+                            GENOME_HASHTABLE[f"{ipn}|{opn}"] = INNOVATION_NUM
+                            connection_list.append(Connection(GENOME_HASHTABLE[f"{ipn}|{opn}"], ipn, opn, random.uniform(-20, 20)))
+                            total_connections -= 1
+                        if total_connections == 0:
+                            break
+                    if total_connections == 0:
+                            break
+            else:
+                for hn in range(hn_start, hn_start + hn_amount):
+                    for ipn in range(1, ipn_amount + 1):
+                        if f"{ipn}|{hn}" in GENOME_HASHTABLE:
+                            connection_list.append(Connection(GENOME_HASHTABLE[f"{ipn}|{hn}"], ipn, hn, random.uniform(-20, 20)))
+                            total_connections -= 1
+                        else:
+                            INNOVATION_NUM += 1
+                            GENOME_HASHTABLE[f"{ipn}|{hn}"] = INNOVATION_NUM
+                            connection_list.append(Connection(GENOME_HASHTABLE[f"{ipn}|{hn}"], ipn, hn, random.uniform(-20, 20)))
+                            total_connections -= 1
+                        if total_connections == 0:
+                            break
+                    for opn in range(opn_start, opn_start + opn_amount):
+                        if f"{hn}|{opn}" in GENOME_HASHTABLE:
+                            connection_list.append(Connection(GENOME_HASHTABLE[f"{hn}|{opn}"], hn, opn, random.uniform(-20, 20)))
+                            total_connections -= 1
+                        else:
+                            INNOVATION_NUM += 1
+                            GENOME_HASHTABLE[f"{hn}|{opn}"] = INNOVATION_NUM
+                            connection_list.append(Connection(GENOME_HASHTABLE[f"{hn}|{opn}"], hn, opn, random.uniform(-20, 20)))
+                            total_connections -= 1
+                        if total_connections == 0:
+                            break
+                    if total_connections == 0:
+                        break
+    return connection_list
+
+
+class Brain:
+    def __init__(self, input_neurons: int = INPUT_NEURONS, hidden_neurons: int = HIDDEN_NEURONS, output_neurons: int = OUTPUT_NEURONS, connections_percentage: int = CONNECTIONS_PERCENTAGE):
+        """Set the innovation number"""
+        logger.debug(f"NN info: ipn = {input_neurons}; hn = {hidden_neurons}; opn = {output_neurons}; ic% = {connections_percentage}")
+        global GENOME_HASHTABLE, INNOVATION_NUM
+
+        self.__neuron_list = generate_initial_neuron_list(input_neurons, hidden_neurons, output_neurons)
+        logger.debug(f"Total neurons: {len(self.__neuron_list)}")
+
+        total_connections = calculate_initial_connections(input_neurons, hidden_neurons, output_neurons, connections_percentage)
+        logger.debug(f"Total connections: {total_connections}")
+
+        self.__connection_list = generate_initial_connection_list(total_connections, input_neurons, hidden_neurons, output_neurons)
+
+        neuron_numbers = [(neuron.get_id(), neuron.get_type()) for neuron in self.__neuron_list]
+        logger.debug(f"Neuron numbers/type: {neuron_numbers}")
+    
+    def set_layers(self): 
+        layers = {}
+        connection_ids_list = []
+        for connection in self.__connection_list:
+            connection_ids = connection.get_ids()
+            connection_ids_list.append(connection_ids)
+            if not str(connection_ids[0]) in layers:
+                layers[str(connection_ids[0])] = 1
+            if not str(connection_ids[1]) in layers:
+                layers[str(connection_ids[1])] = layers[str(connection_ids[0])] + 1
+            else:
+                layers[str(connection_ids[1])] = max(layers[str(connection_ids[0])] + 1, layers[str(connection_ids[1])])
+        logger.debug(f"Debug connections: {connection_ids_list}")
+        logger.debug(f"Debug set layers: {layers}")
+        for neuron in self.__neuron_list:
+            neuron_id = str(neuron.get_id())
+            if not neuron_id == '0':
+                neuron.set_layer(layers[neuron_id])
+    
+    def get_layers(self):
+        # layers = {}
+        # for neuron in self.__neuron_list:
+        #     neuron_id = str(neuron.get_id())
+        #     if not neuron_id == '0':
+        #         layers[neuron_id] = neuron.get_layer()
+        # return layers
+        layers = {}
+        for neuron in self.__neuron_list:
+            neuron_id = neuron.get_id()
+            if not neuron_id == 0:
+                neuron_layer = str(neuron.get_layer())
+                if not neuron_layer in layers:
+                    layers[neuron_layer] = []
+                    layers[neuron_layer].append(neuron_id)
+                else:
+                    layers[neuron_layer].append(neuron_id)
+        return layers
+    
+    def draw_network(self):
+        for key in Neurons:
+            for position in Neurons[key]:
+                draw_neuron(position, key)
+        for connection in Connections:
+            draw_connection(connection[0], connection[1])
+
+    def get_neuron_list(self) -> list[Neuron]:
+        return self.__neuron_list
+    
+    def get_connection_list(self) -> list[Connection]:
+        return self.__connection_list
+
+
 def main(brain):
     global running, screen
     pygame.init()
+
+    brain.set_layers()
+    brain_layers = brain.get_layers()
+    logger.debug(f"Layers: {brain_layers}")
+    logger.debug(f"Total layers: {len(brain_layers)}")
 
     while running:
         clock.tick(60)
@@ -267,11 +335,7 @@ def main(brain):
             if event.type == QUIT:
                 running = False
         screen.fill((25, 25, 25))
-        for key in Neurons:
-            for position in Neurons[key]:
-                draw_neuron(position, key)
-        for connection in Connections:
-            draw_connection(connection[0], connection[1])
+        brain.draw_network()
 
         pygame.display.update()
     
@@ -280,7 +344,7 @@ def main(brain):
 if __name__ == '__main__':
     running = True
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s | %(levelname)s | %(message)s")
-    my_brain = Brain(7, 0, 5, 100)
+    my_brain = Brain(2, 2, 1, 100)
     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
     screen = pygame.display.set_mode([WIDTH, HEIGHT], RESIZABLE)
     main(my_brain)
