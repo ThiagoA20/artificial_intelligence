@@ -77,8 +77,10 @@ class Neuron:
     def activate_neuron(self):
         if (self.__neuron_type == 1):
             self.__sum_output = self.__sum_input
+            self.__sum_input = 0
         else:
             self.__sum_output = self.__activation(self.__sum_input)
+            self.__sum_input = 0
 
 
 class Connection:
@@ -122,31 +124,6 @@ class Connection:
 class Specie:
     def __init__(self):
         pass
-
-
-Connections = [
-    [(520, 180), (580, 230)],
-    [(520, 180), (580, 330)],
-    [(520, 180), (580, 430)],
-    [(520, 280), (580, 230)],
-    [(520, 280), (580, 330)],
-    [(520, 280), (580, 430)],
-    [(520, 380), (580, 230)],
-    [(520, 380), (580, 330)],
-    [(520, 380), (580, 430)],
-    [(520, 480), (580, 230)],
-    [(520, 480), (580, 330)],
-    [(520, 480), (580, 430)],
-    [(620, 230), (680, 230)],
-    [(620, 330), (680, 330)],
-    [(620, 430), (680, 430)],
-    [(720, 230), (780, 280)],
-    [(720, 230), (780, 380)],
-    [(720, 330), (780, 280)],
-    [(720, 330), (780, 380)],
-    [(720, 430), (780, 280)],
-    [(720, 430), (780, 380)]
-]
 
 
 def draw_neuron(position, type, radius):
@@ -250,6 +227,8 @@ class Brain:
         logger.debug(f"NN info: ipn = {input_neurons}; hn = {hidden_neurons}; opn = {output_neurons}; ic% = {connections_percentage}")
         global GENOME_HASHTABLE, INNOVATION_NUM
 
+        self.__input_neurons = input_neurons
+
         self.__neuron_list = generate_initial_neuron_list(input_neurons, hidden_neurons, output_neurons)
         logger.debug(f"Total neurons: {len(self.__neuron_list)}")
 
@@ -337,6 +316,29 @@ class Brain:
     
     def get_connection_list(self) -> list[Connection]:
         return self.__connection_list
+    
+    def load_inputs(self, input_list):
+        if len(input_list) != self.__input_neurons:
+            raise ValueError("The number of the inputs given must be equal to the number of input neurons in the network!")
+        else:
+            for i in range(1, self.__input_neurons + 1):
+                self.__neuron_list[i].calculate_sum([input_list[i - 1]])
+                self.__neuron_list[i].activate_neuron()
+
+    def run_network(self):
+        layer_values = list(self.__layers.values())
+        for layer_num in range(1, len(layer_values)):
+            for neuron_num in range(len(layer_values[layer_num])):
+                neuron = layer_values[layer_num][neuron_num]
+                input_list = []
+                for connection in self.__connection_list:
+                    connection_ids = connection.get_ids()
+                    if connection_ids[1] == neuron:
+                        input_list.append(self.__neuron_list[connection_ids[0]].get_output() * connection.get_weight())
+                        # print(f"{connection_ids}: {self.__neuron_list[connection_ids[0]].get_output()}")
+                self.__neuron_list[neuron].calculate_sum(input_list)
+                self.__neuron_list[neuron].activate_neuron()
+                # print(f"{neuron}: {self.__neuron_list[neuron].get_output()}")
 
 
 def main(brain):
@@ -346,6 +348,8 @@ def main(brain):
     brain.set_layers()
     brain_layers = brain.get_layers()
     logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
+    brain.load_inputs([10, 5, 3, 4, 1, 2, 9])
+    brain.run_network()
 
     while running:
         clock.tick(60)
@@ -362,7 +366,7 @@ def main(brain):
 if __name__ == '__main__':
     running = True
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
-    my_brain = Brain(7, 3, 5, 100)
+    my_brain = Brain(7, 1, 5, 100)
     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
     screen = pygame.display.set_mode([WIDTH, HEIGHT], RESIZABLE)
     main(my_brain)
