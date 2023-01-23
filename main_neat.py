@@ -32,6 +32,70 @@ OUTPUT_NEURONS = 1
 CONNECTIONS_PERCENTAGE = 25
 DEFAULT_ACTIVATION = sigmoid
 
+pygame.font.init()
+font = pygame.font.SysFont('rockwell', 17)
+big_font = pygame.font.SysFont('rockwell', 21)
+
+def newPosition(posy, posx, width1, height1, width2, height2):
+    proportion_y = posy / height1
+    proportion_x = posx / width1
+
+    return (round(proportion_x * width2), round(proportion_y * height2))
+
+class DrawItem:
+    def __init__(self, posx, posy, width, height, color, target=None, center=True):
+        if center:
+            self.x = posx - width/2
+            self.y = posy - height/2
+        else:
+            self.x = posx
+            self.y = posy
+        self.w = width
+        self.h = height
+        self.rect = pygame.Rect(posx, posy, width, height)
+        self.color = color
+        self.target = target
+
+    def draw(self, item_posx, item_posy, width, height):
+        pygame.draw.rect(screen, self.color, (item_posx, item_posy, width, height), 3)
+    
+    def check_event(self, posx, posy):
+        pass
+
+    def react_event(self):
+        pass
+
+class Label(DrawItem):
+    def __init__(self, font, text, color, position, anchor="left"):
+        self.image = font.render(text, 1, color)
+        self.text = text
+        self.color = color
+        self.cursor = pygame.SYSTEM_CURSOR_HAND
+        self.rect = self.image.get_rect()
+        self.position = position
+        self.anchor = anchor
+        self.rect.top = position[1]
+        self.rect.right = position[0]
+        # setattr(self.rect, anchor, position)
+
+    def draw(self):
+        if HEIGHT > 900:
+            self.image = big_font.render(self.text, 1, self.color)
+            self.rect = self.image.get_rect()
+        else:
+            self.image = font.render(self.text, 1, self.color)
+            self.rect = self.image.get_rect()
+        np = newPosition(self.position[1], self.position[0], 1280, 720, WIDTH, HEIGHT)
+        if self.anchor == "left":
+            txt_pos = pygame.Rect(np[0], np[1], self.rect.w, self.rect.h)
+        else:
+            txt_pos = pygame.Rect(np[0], np[1], self.rect.w, self.rect.h)
+            txt_pos.right = np[0]
+        screen.blit(self.image, txt_pos)
+    
+    def getRect(self):
+        return self.rect
+
 INNOVATION_NUM = 0
 
 GENOME_HASHTABLE = {}
@@ -274,6 +338,7 @@ class Brain:
         return dict(sorted(layers.items()))
     
     def draw_network(self):
+        global screen, font
         start_x = 340
         start_y = 60
         c_width = 600
@@ -305,11 +370,19 @@ class Brain:
 
                 draw_neuron((pos_x, pos_y), neuron_type, n_radius)
 
+                neuron_id = Label(font, f"{layer_values[layer_num][neuron_num]}", (255, 255, 255), (pos_x - 8, pos_y - 10))
+                neuron_id.draw()
+                neuron_opt = Label(font, f"{round(self.__neuron_list[layer_values[layer_num][neuron_num]].get_output(), 4)}", (255, 165, 0), (pos_x + 20, pos_y - 40))
+                neuron_opt.draw()
+
         for connection in self.__connection_list:
             connection_id = connection.get_ids()
             n1_pos = neuron_position[connection_id[0]]
             n2_pos = neuron_position[connection_id[1]]
             draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]))
+
+            connection_weight = Label(font, f"{round(connection.get_weight(), 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
+            connection_weight.draw()
 
     def get_neuron_list(self) -> list[Neuron]:
         return self.__neuron_list
