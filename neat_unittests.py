@@ -138,9 +138,6 @@ class BrainTestCase(unittest.TestCase):
 
     # def test_layers_3_2_1_1(self):
     #     pass
-    
-    def test_initialize_from_file(self):
-        pass
 
     def test_add_node(self):
         pass
@@ -148,13 +145,45 @@ class BrainTestCase(unittest.TestCase):
     def test_add_connection(self):
         pass
 
-    def test_mutate(self):
+    def test_mutate_weights(self):
         pass
 
     def test_load_inputs(self):
-        pass
+        new_brain = Brain(input_neurons=self.INPUT_NEURONS, hidden_neurons=self.HIDDEN_NEURONS, output_neurons=self.OUTPUT_NEURONS, connections_percentage=self.CONNECTIONS_PERCENTAGE)
+        with self.assertRaises(ValueError):
+            new_brain.load_inputs([12, 32, 21])
+        input_list = [10, 12, 32, 14, 85, 11, 75]
+        new_brain.load_inputs(input_list)
+        test_inputs = []
+        for neuron in range(1, self.INPUT_NEURONS + 1):
+            test_inputs.append(new_brain.get_neuron_list()[neuron].get_output())
+        self.assertEqual(test_inputs, input_list)
 
     def test_run_network(self):
+        new_brain = Brain(input_neurons=self.INPUT_NEURONS, hidden_neurons=self.HIDDEN_NEURONS, output_neurons=self.OUTPUT_NEURONS, connections_percentage=self.CONNECTIONS_PERCENTAGE)
+        self.assertEqual(new_brain.get_outputs(), [0, 0, 0, 0, 0])
+        input_list = [99, 99, 92, 94, 95, 91, 95]
+        new_brain.load_inputs(input_list)
+        new_brain.run_network()
+        self.assertNotEqual(new_brain.get_outputs(), [0, 0, 0, 0, 0])
+
+    def test_draw_network(self):
+        pass
+
+class SpecieTestCase(unittest.TestCase):
+
+    def test_1(self):
+        pass
+
+class PopulationTestCase(unittest.TestCase):
+
+    def test_initialize_from_file(self):
+        pass
+
+    def test_crossover(self):
+        pass
+
+    def test_calculate_fitness(self):
         pass
 
 

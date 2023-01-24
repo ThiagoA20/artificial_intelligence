@@ -9,6 +9,8 @@ import time
 
 logger = logging.getLogger(__name__)
 
+# ----- Pygame Draw network --------------------------------------------------------------------
+
 WIDTH = 1280
 HEIGHT = 720    
 ICON = pygame.image.load('D:\\projects\\enigma\\common\\graphical_interface\\brain_analyser\\assets\\ba_icon.png')
@@ -17,20 +19,9 @@ clock = pygame.time.Clock()
 pygame.display.set_caption('Brain analyser')
 running = False
 
-
-def sigmoid(x):
-    return 1 / (1 + math.exp(-x))
-
 INPUT_COLOR = (255, 25, 25)
 HIDDEN_COLOR = (75, 75, 75)
 OUTPUT_COLOR = (25, 255, 25)
-
-POPSIZE = 0
-INPUT_NEURONS = 2
-HIDDEN_NEURONS = 0
-OUTPUT_NEURONS = 1
-CONNECTIONS_PERCENTAGE = 25
-DEFAULT_ACTIVATION = sigmoid
 
 pygame.font.init()
 font = pygame.font.SysFont('rockwell', 17)
@@ -96,9 +87,41 @@ class Label(DrawItem):
     def getRect(self):
         return self.rect
 
+def draw_neuron(position, type, radius):
+    global screen
+    if type == "HIDDEN":
+        pygame.draw.circle(screen, HIDDEN_COLOR, position, radius)
+    elif type == "OUTPUT":
+        pygame.draw.circle(screen, OUTPUT_COLOR, position, radius, 2)
+    else:
+        pygame.draw.circle(screen, INPUT_COLOR, position, radius, 2)
+
+def draw_connection(position1, position2):
+    global screen
+    pygame.draw.line(screen, (150, 150, 150), position1, position2)
+
+# ----- Activation functions -------------------------------------------------------------------
+
+def sigmoid(x):
+    try:
+        return 1 / (1 + math.exp(-x))
+    except OverflowError:
+        return 0
+
+# ----- Network Configurations -----------------------------------------------------------------
+
+POPSIZE = 0
+INPUT_NEURONS = 2
+HIDDEN_NEURONS = 0
+OUTPUT_NEURONS = 1
+CONNECTIONS_PERCENTAGE = 25
+DEFAULT_ACTIVATION = sigmoid
+
 INNOVATION_NUM = 0
 
 GENOME_HASHTABLE = {}
+
+# ----- Implementation Details -----------------------------------------------------------------
 
 class Neuron:
 
@@ -126,7 +149,7 @@ class Neuron:
     def get_layer(self) -> int:
         return self.__neuron_layer
     
-    def set_layer(self, layer):
+    def set_layer(self, layer: int):
         self.__neuron_layer = layer
     
     def get_sum(self) -> float:
@@ -185,26 +208,7 @@ class Connection:
         self.__active = not self.__active
 
 
-class Specie:
-    def __init__(self):
-        pass
-
-
-def draw_neuron(position, type, radius):
-    global screen
-    if type == "HIDDEN":
-        pygame.draw.circle(screen, HIDDEN_COLOR, position, radius)
-    elif type == "OUTPUT":
-        pygame.draw.circle(screen, OUTPUT_COLOR, position, radius, 2)
-    else:
-        pygame.draw.circle(screen, INPUT_COLOR, position, radius, 2)
-
-def draw_connection(position1, position2):
-    global screen
-    pygame.draw.line(screen, (150, 150, 150), position1, position2)
-
-
-def calculate_initial_connections(ipn_amount, hd_amount, opt_amount, ic_percentage):
+def calculate_initial_connections(ipn_amount, hd_amount, opt_amount, ic_percentage) -> int:
     real_connections = lambda x: math.ceil(x * ic_percentage/100)
     if hd_amount > 0:
         connection_amount = (ipn_amount * hd_amount) + (hd_amount * opt_amount)
@@ -213,7 +217,7 @@ def calculate_initial_connections(ipn_amount, hd_amount, opt_amount, ic_percenta
     return real_connections(connection_amount)
 
 
-def generate_initial_neuron_list(ipn_amount, hd_amount, opt_amount):
+def generate_initial_neuron_list(ipn_amount, hd_amount, opt_amount) -> list[Neuron]:
     neuron_list = []
     neuron_counter = 0
     total_neurons = ipn_amount + opt_amount + hd_amount + 1
@@ -234,7 +238,7 @@ def generate_initial_neuron_list(ipn_amount, hd_amount, opt_amount):
     return neuron_list
 
 
-def generate_initial_connection_list(total_connections: int, ipn_amount: int, hn_amount: int, opn_amount: int):
+def generate_initial_connection_list(total_connections: int, ipn_amount: int, hn_amount: int, opn_amount: int) -> list[Connection]:
     global GENOME_HASHTABLE, INNOVATION_NUM
 
     connection_list = []
@@ -292,6 +296,7 @@ class Brain:
         global GENOME_HASHTABLE, INNOVATION_NUM
 
         self.__input_neurons = input_neurons
+        self.__output_neurons = output_neurons
 
         self.__neuron_list = generate_initial_neuron_list(input_neurons, hidden_neurons, output_neurons)
         logger.debug(f"Total neurons: {len(self.__neuron_list)}")
@@ -322,8 +327,10 @@ class Brain:
             neuron_id = str(neuron.get_id())
             if not neuron_id == '0':
                 neuron.set_layer(layers[neuron_id])
+        if self.__layers == {}:
+            self.get_layers()
     
-    def get_layers(self):
+    def get_layers(self) -> dict:
         layers = {}
         for neuron in self.__neuron_list:
             neuron_id = neuron.get_id()
@@ -348,6 +355,8 @@ class Brain:
         container_w = 60
 
         neuron_position = {}
+        if self.__layers == {}:
+            self.set_layers()
         layer_values = list(self.__layers.values())
 
         x_align = (c_width - (container_w * len(self.__layers))) / (len(self.__layers) + 1)
@@ -370,9 +379,9 @@ class Brain:
 
                 draw_neuron((pos_x, pos_y), neuron_type, n_radius)
 
-                neuron_id = Label(font, f"{layer_values[layer_num][neuron_num]}", (255, 255, 255), (pos_x - 8, pos_y - 10))
+                neuron_id = Label(font, f"{layer_values[layer_num][neuron_num]}", (255, 255, 255), (pos_x - n_radius/2.5, pos_y - n_radius/2))
                 neuron_id.draw()
-                neuron_opt = Label(font, f"{round(self.__neuron_list[layer_values[layer_num][neuron_num]].get_output(), 4)}", (255, 165, 0), (pos_x + 20, pos_y - 40))
+                neuron_opt = Label(font, f"{round(self.__neuron_list[layer_values[layer_num][neuron_num]].get_output(), 4)}", (255, 165, 0), (pos_x + n_radius, pos_y - n_radius * 2))
                 neuron_opt.draw()
 
         for connection in self.__connection_list:
@@ -390,7 +399,9 @@ class Brain:
     def get_connection_list(self) -> list[Connection]:
         return self.__connection_list
     
-    def load_inputs(self, input_list):
+    def load_inputs(self, input_list: list[int]):
+        if self.__layers == {}:
+            self.set_layers()
         if len(input_list) != self.__input_neurons:
             raise ValueError("The number of the inputs given must be equal to the number of input neurons in the network!")
         else:
@@ -412,16 +423,33 @@ class Brain:
                 self.__neuron_list[neuron].calculate_sum(input_list)
                 self.__neuron_list[neuron].activate_neuron()
                 # print(f"{neuron}: {self.__neuron_list[neuron].get_output()}")
+    
+    def get_outputs(self) -> list:
+        output_values = []
+        for i in range(self.__input_neurons+1, self.__input_neurons + self.__output_neurons + 1):
+            output_values.append(self.__neuron_list[i].get_output())
+        # print(output_values)
+        return output_values
 
+
+class Specie:
+    def __init__(self):
+        pass
+
+
+class Population:
+    def __init__(self):
+        pass
+
+# ----- Run pygame app ------------------------------------------------------------------------
 
 def main(brain):
     global running, screen
     pygame.init()
 
-    brain.set_layers()
+    brain.load_inputs([99, 99, 92, 94, 95, 91, 95])
     brain_layers = brain.get_layers()
     logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
-    brain.load_inputs([10, 5, 3, 4, 1, 2, 9])
     brain.run_network()
 
     while running:
