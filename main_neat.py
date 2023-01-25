@@ -108,6 +108,15 @@ def sigmoid(x):
     except OverflowError:
         return 0
 
+def ReLU(x):
+    pass
+
+def Step(x):
+    pass
+
+def SoftMax(x):
+    pass
+
 # ----- Network Configurations -----------------------------------------------------------------
 
 POPSIZE = 0
@@ -295,6 +304,8 @@ class Brain:
         logger.debug(f"NN info: ipn = {input_neurons}; hn = {hidden_neurons}; opn = {output_neurons}; ic% = {connections_percentage}")
         global GENOME_HASHTABLE, INNOVATION_NUM
 
+        self.specie_num = 0
+
         self.__input_neurons = input_neurons
         self.__output_neurons = output_neurons
 
@@ -351,15 +362,18 @@ class Brain:
         c_width = 600
         c_height = 600
 
+        """Make it proportional to the width and height of the network canvas"""
         n_radius = 20
         container_w = 60
 
         neuron_position = {}
+        """Ajust set layers to always start with some content to avoid check all those if statements"""
         if self.__layers == {}:
             self.set_layers()
         layer_values = list(self.__layers.values())
 
         x_align = (c_width - (container_w * len(self.__layers))) / (len(self.__layers) + 1)
+        """Set the option as a boolean to draw the canvas when needed for debug"""
         # pygame.draw.rect(screen, (255, 255, 0), (start_x, start_y, c_width, c_height), 3)
         for layer_num in range(len(self.__layers)):
             # pygame.draw.rect(screen, (255, 255, 255), (start_x + x_align * (layer_num + 1) + container_w * layer_num, start_y, container_w, c_height), 3)
@@ -399,7 +413,7 @@ class Brain:
     def get_connection_list(self) -> list[Connection]:
         return self.__connection_list
     
-    def load_inputs(self, input_list: list[int]):
+    def load_inputs(self, input_list: list):
         if self.__layers == {}:
             self.set_layers()
         if len(input_list) != self.__input_neurons:
@@ -414,6 +428,7 @@ class Brain:
         for layer_num in range(1, len(layer_values)):
             for neuron_num in range(len(layer_values[layer_num])):
                 neuron = layer_values[layer_num][neuron_num]
+                """Include the bias here"""
                 input_list = []
                 for connection in self.__connection_list:
                     connection_ids = connection.get_ids()
@@ -431,6 +446,85 @@ class Brain:
         # print(output_values)
         return output_values
 
+    def add_connection(self):
+        global GENOME_HASHTABLE, INNOVATION_NUM
+        """
+        Dois neurônios na rede são escolhidos aleatoriamente
+        
+        Validação:
+        - Não pode já haver uma conexão entre os neurônios
+        - Não pode escolher duas vezes o mesmo neurônio
+        - Não pode conectar dois neurônios na mesma camada
+        - Não pode conectar um neurônio de uma camada maior com um neurônio em uma camada menor, a não ser que conexões recorrentes sejam permitidas
+        - O peso para a nova conexão é definido como um valor aleatório
+        - O innovation id é pego da tabela se já existir, se não, é adicionado mais um no contador e definido o valor na tabela
+        - A conexão é definida como ativada
+        - Como desativar uma conexão?
+        
+        Probabilidade:
+        - Para o XOR, há 5% de chance de uma conexão ser adicionada depois do crossover
+        - Permitir 20 tentativas de conseguir um par de nodos válidos para criar a conexão que não quebra as regras de validação
+        - Se há uma conexão entre dois neurônios e está desativada, há 25% de chance de ela ser reativada
+        """
+        self.set_layers()
+        new_connection = None
+        attempts = 10
+        while new_connection == None or attempts > 0:
+            valid_n1_set = []
+            for i in range(len(self.__neuron_list)):
+                if i >= 1 and i <= self.__input_neurons or i > self.__input_neurons + self.__output_neurons:
+                    valid_n1_set.append(i)
+            n1 = valid_n1_set[random.randint(0, len(valid_n1_set) - 1)]
+            n1_layer = self.__neuron_list[n1].get_layer()
+            valid_n2_set = []
+            for camada in range(n1_layer, len(self.__layers)):
+                for neuron in list(self.__layers.values())[camada]:
+                    valid_n2_set.append(neuron)
+            n2 = valid_n2_set[random.randint(0, len(valid_n2_set) - 1)]
+            connection_exists = False
+            for connection in self.__connection_list:
+                if connection.get_ids() == (n1, n2):
+                    connection_exists = True
+                    break
+            if not connection_exists:
+                if f"{n1}|{n2}" not in GENOME_HASHTABLE:
+                    INNOVATION_NUM += 1
+                    GENOME_HASHTABLE[f"{n1}|{n2}"] = INNOVATION_NUM
+                    new_connection = Connection(GENOME_HASHTABLE[f"{n1}|{n2}"], n1, n2, random.uniform(-20, 20), True)
+                else:
+                    new_connection = Connection(GENOME_HASHTABLE[f"{n1}|{n2}"], n1, n2, random.uniform(-20, 20), True)
+            attempts -= 1
+        if new_connection != None:
+            self.__connection_list.append(new_connection)
+        
+        # Criar conexões recorrentes
+
+    def add_node(self):
+        """
+        Uma conexão foward ativada é escolhida aleatoriamente
+        
+        - A conexão é desativada
+        - Um novo neurônio é colocado no array de neurônios
+        - Duas novas conexões são adicionadas no array de conexões, uma conectada com a camada anterior e o novo neurônio e a outra conectada com o novo neurônio e a camada posterior
+        - Uma das conexões recebe como valor para o peso o valor da conexão que foi desativada e a outra recebe um novo valor aleatório
+        - As camadas são redefinidas
+        - Se um neurônio surgir em um ponto de modo que faça uma conexão se tornar recorrente, então o valor de isRecurrent é definido como verdadeiro e a conexão é desativada, o contrário também é válido se uma conexão que antes era recorrente virar foward então é definido que ela não é recorrente mudando o valor de isRecurrent para falso
+        """
+        # self.set_layers()
+        # selected_connection = self.__connection_list[random.randint(0, len(self.__connection_list) - 1)]
+        # selected_connection.change_state()
+        # new_neuron = Neuron()
+        # return selected_connection.get_info()
+        # self.set_layers()
+        # Depois de adicionar o neurônio, verificar cada camada para ver se foi
+        # formada uma conexão recorrente, se sim, desativar a conexão
+        # Verificar se existem conexões recorrentes desativadas e checkar se elas
+        # ainda são recorrentes, se não, mudar o estado de recorrente para false
+        pass
+
+    def mutate_weights(self):
+        pass
+    
 
 class Specie:
     def __init__(self):
@@ -438,7 +532,41 @@ class Specie:
 
 
 class Population:
-    def __init__(self):
+    def __init__(self, popsize: int, brain_settings: dict, allow_bias: bool, allow_recurrency: bool):
+        self.__population_size = popsize
+        self.__brain_settings = brain_settings
+        self.__allow_bias = allow_bias
+        self.__allow_recurrency = allow_recurrency
+        self.__indivuduals_list = []
+        for i in range(self.__population_size):
+            self.__indivuduals_list.append(Brain(brain_settings["INPUTS"], brain_settings["HIDDEN"], brain_settings["OUTPUTS"], brain_settings["CONNECTIONS"]))
+    
+    def set_inputs(self, input_list):
+        for individual in self.__indivuduals_list:
+            individual.load_inputs(input_list)
+    
+    def run_simulation(self):
+        pass
+    
+    def calculate_fitness(self, fitness_function: callable):
+        pass
+
+    def speciation(self):
+        pass
+
+    def crossover(self):
+        pass
+
+    def get_best_individual_species(self) -> list[Brain]:
+        pass
+
+    def get_best_individual_population(self) -> Brain:
+        pass
+
+    def save_population(self):
+        pass
+
+    def load_population(self):
         pass
 
 # ----- Run pygame app ------------------------------------------------------------------------
@@ -451,6 +579,7 @@ def main(brain):
     brain_layers = brain.get_layers()
     logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
     brain.run_network()
+    brain.add_connection()
 
     while running:
         clock.tick(60)

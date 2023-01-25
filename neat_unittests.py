@@ -91,16 +91,16 @@ class BrainTestCase(unittest.TestCase):
         self.HIDDEN_NEURONS = 1
         self.OUTPUT_NEURONS = 5
         self.CONNECTIONS_PERCENTAGE = 100
+        self.new_brain = Brain(input_neurons=self.INPUT_NEURONS, hidden_neurons=self.HIDDEN_NEURONS, output_neurons=self.OUTPUT_NEURONS, connections_percentage=self.CONNECTIONS_PERCENTAGE)
 
     def test_initialize(self):
-        new_brain = Brain(input_neurons=self.INPUT_NEURONS, hidden_neurons=self.HIDDEN_NEURONS, output_neurons=self.OUTPUT_NEURONS, connections_percentage=self.CONNECTIONS_PERCENTAGE)
-        self.assertEqual(len(new_brain.get_neuron_list()), self.INPUT_NEURONS + self.HIDDEN_NEURONS + self.OUTPUT_NEURONS + 1)
+        self.assertEqual(len(self.new_brain.get_neuron_list()), self.INPUT_NEURONS + self.HIDDEN_NEURONS + self.OUTPUT_NEURONS + 1)
         real_connections = lambda x: ceil(x * self.CONNECTIONS_PERCENTAGE / 100)
         if self.HIDDEN_NEURONS > 0:
             connection_amount = (self.INPUT_NEURONS * self.HIDDEN_NEURONS) + (self.HIDDEN_NEURONS * self.OUTPUT_NEURONS)
         else:
             connection_amount = (self.INPUT_NEURONS * self.OUTPUT_NEURONS)
-        self.assertEqual(len(new_brain.get_connection_list()), real_connections(connection_amount))
+        self.assertEqual(len(self.new_brain.get_connection_list()), real_connections(connection_amount))
     
     def test_initial_connection_list(self):
         """Quando tem apenas um neurônio escondido, conecta todos os neurônios de entrada a ele e depois conecta o neurônio escondido a todos os neurônios de saída"""
@@ -122,41 +122,28 @@ class BrainTestCase(unittest.TestCase):
         self.assertEqual(connection_array, [(1, 4), (2, 4), (4, 3), (1, 5), (2, 5), (5, 3)])
     
     def test_layers_7_1_5(self):
-        new_brain = Brain(7, 1, 5, 100)
-        new_brain.set_layers()
-        self.assertEqual(new_brain.get_layers(), {"1": [1, 2, 3, 4, 5, 6, 7], "2": [13], "3": [8, 9, 10, 11, 12]})
+        test_brain = Brain(7, 1, 5, 100)
+        test_brain.set_layers()
+        self.assertEqual(test_brain.get_layers(), {"1": [1, 2, 3, 4, 5, 6, 7], "2": [13], "3": [8, 9, 10, 11, 12]})
     
     def test_layers_7_5(self):
-        new_brain = Brain(7, 0, 5, 100)
-        new_brain.set_layers()
-        self.assertEqual(new_brain.get_layers(), {"1": [1, 2, 3, 4, 5, 6, 7], "2": [8, 9, 10, 11, 12]})
+        test_brain = Brain(7, 0, 5, 100)
+        test_brain.set_layers()
+        self.assertEqual(test_brain.get_layers(), {"1": [1, 2, 3, 4, 5, 6, 7], "2": [8, 9, 10, 11, 12]})
     
     def test_layers_2_2_1(self):
-        new_brain = Brain(2, 2, 1, 100)
-        new_brain.set_layers()
-        self.assertEqual(new_brain.get_layers(), {"1": [1, 2], "2": [4, 5], "3": [3]})
-
-    # def test_layers_3_2_1_1(self):
-    #     pass
-
-    def test_add_node(self):
-        pass
-
-    def test_add_connection(self):
-        pass
-
-    def test_mutate_weights(self):
-        pass
+        test_brain = Brain(2, 2, 1, 100)
+        test_brain.set_layers()
+        self.assertEqual(test_brain.get_layers(), {"1": [1, 2], "2": [4, 5], "3": [3]})
 
     def test_load_inputs(self):
-        new_brain = Brain(input_neurons=self.INPUT_NEURONS, hidden_neurons=self.HIDDEN_NEURONS, output_neurons=self.OUTPUT_NEURONS, connections_percentage=self.CONNECTIONS_PERCENTAGE)
         with self.assertRaises(ValueError):
-            new_brain.load_inputs([12, 32, 21])
+            self.new_brain.load_inputs([12, 32, 21])
         input_list = [10, 12, 32, 14, 85, 11, 75]
-        new_brain.load_inputs(input_list)
+        self.new_brain.load_inputs(input_list)
         test_inputs = []
         for neuron in range(1, self.INPUT_NEURONS + 1):
-            test_inputs.append(new_brain.get_neuron_list()[neuron].get_output())
+            test_inputs.append(self.new_brain.get_neuron_list()[neuron].get_output())
         self.assertEqual(test_inputs, input_list)
 
     def test_run_network(self):
@@ -167,7 +154,17 @@ class BrainTestCase(unittest.TestCase):
         new_brain.run_network()
         self.assertNotEqual(new_brain.get_outputs(), [0, 0, 0, 0, 0])
 
-    def test_draw_network(self):
+    def test_add_connection(self):
+        self.new_brain.add_connection()
+        self.assertEqual(len(self.new_brain.get_connection_list()), 13)
+
+    def test_layers_3_2_1_1(self):
+        pass
+
+    def test_add_node(self):
+        print(self.new_brain.add_node())
+
+    def test_mutate_weights(self):
         pass
 
 class SpecieTestCase(unittest.TestCase):
