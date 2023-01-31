@@ -305,6 +305,7 @@ class Brain:
         global GENOME_HASHTABLE, INNOVATION_NUM
 
         self.specie_num = 0
+        self.fitness = 0
 
         self.__input_neurons = input_neurons
         self.__output_neurons = output_neurons
@@ -510,11 +511,11 @@ class Brain:
         - As camadas são redefinidas
         - Se um neurônio surgir em um ponto de modo que faça uma conexão se tornar recorrente, então o valor de isRecurrent é definido como verdadeiro e a conexão é desativada, o contrário também é válido se uma conexão que antes era recorrente virar foward então é definido que ela não é recorrente mudando o valor de isRecurrent para falso
         """
-        # self.set_layers()
-        # selected_connection = self.__connection_list[random.randint(0, len(self.__connection_list) - 1)]
-        # selected_connection.change_state()
-        # new_neuron = Neuron()
-        # return selected_connection.get_info()
+        self.set_layers()
+        selected_connection = self.__connection_list[random.randint(0, len(self.__connection_list) - 1)]
+        selected_connection.change_state()
+        new_neuron = Neuron()
+        return selected_connection.get_info()
         # self.set_layers()
         # Depois de adicionar o neurônio, verificar cada camada para ver se foi
         # formada uma conexão recorrente, se sim, desativar a conexão
@@ -522,13 +523,23 @@ class Brain:
         # ainda são recorrentes, se não, mudar o estado de recorrente para false
         pass
 
+    def set_fitness(self, fitness):
+        self.fitness += fitness
+    
+    def get_fitness(self) -> float:
+        return self.fitness
+
     def mutate_weights(self):
         pass
     
 
 class Specie:
     def __init__(self):
-        pass
+        self.id = 0
+        self.individuals = []
+        self.fitness = 0
+        self.offspring = 0
+        self.gens_since_improved = 0
 
 
 class Population:
@@ -546,10 +557,30 @@ class Population:
             individual.load_inputs(input_list)
     
     def run_simulation(self):
-        pass
+        for individual in self.__indivuduals_list:
+            individual.run_network()
     
-    def calculate_fitness(self, fitness_function: callable):
-        pass
+    def calculate_fitness(self, fitness_function: callable, answers):
+        for individual in range(len(self.__indivuduals_list)):
+            fitness_value = fitness_function(self.__indivuduals_list[individual].get_outputs(), answers)
+            self.__indivuduals_list[individual].set_fitness(fitness_value)
+
+    def draw_fittest_network(self):
+        fittest_id = 0
+        max_fitness = 0
+        for individual in range(len(self.__indivuduals_list)):
+            individual_fitness = self.__indivuduals_list[individual].get_fitness()
+            if individual_fitness > max_fitness:
+                max_fitness = individual_fitness
+                fittest_id = individual
+            # print(f"{individual}: {individual_fitness}")
+        self.__indivuduals_list[fittest_id].draw_network()
+    
+    def get_fitness(self) -> list:
+        fitness_list = []
+        for individual in range(len(self.__indivuduals_list)):
+            fitness_list.append({f"{individual}": self.__indivuduals_list[individual].get_fitness()})
+        return fitness_list
 
     def speciation(self):
         pass
@@ -571,15 +602,40 @@ class Population:
 
 # ----- Run pygame app ------------------------------------------------------------------------
 
-def main(brain):
+def my_fitness(output_list: list, answers: list) -> float:
+    "output list and answers must be the same size!"
+    fitness = 0
+    for i in range(len(output_list)):
+        fitness += output_list[i] - answers[i]
+    return fitness
+
+inputs_and_answers = {
+    "IP1": [[1, 1], [0]],
+    "IP2": [[1, 0], [1]],
+    "IP3": [[0, 1], [1]],
+    "IP4": [[0, 0], [0]]
+}
+
+def main(population):
     global running, screen
     pygame.init()
 
-    brain.load_inputs([99, 99, 92, 94, 95, 91, 95])
-    brain_layers = brain.get_layers()
-    logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
-    brain.run_network()
-    brain.add_connection()
+    for input_value in inputs_and_answers:
+        population.set_inputs(inputs_and_answers[input_value][0])
+        population.run_simulation()
+        population.calculate_fitness(my_fitness, inputs_and_answers[input_value][1])
+    # brain.load_inputs([99, 99, 92, 94, 95, 91, 95])
+    # brain_layers = brain.get_layers()
+    # logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
+    # brain.run_network()
+    # brain.add_connection()
+    max_fit = 0
+    for individual_fitness in population.get_fitness():
+        fit_value = list(individual_fitness.values())[0]
+        if fit_value > max_fit:
+            max_fit = fit_value
+        print(individual_fitness)
+    print(max_fit)
 
     while running:
         clock.tick(60)
@@ -587,7 +643,7 @@ def main(brain):
             if event.type == QUIT:
                 running = False
         screen.fill((25, 25, 25))
-        brain.draw_network()
+        population.draw_fittest_network()
 
         pygame.display.update()
     
@@ -596,7 +652,25 @@ def main(brain):
 if __name__ == '__main__':
     running = True
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
-    my_brain = Brain(7, 1, 5, 100)
+    my_population = Population(500, {"INPUTS": 2, "HIDDEN": 0, "OUTPUTS": 1, "CONNECTIONS": 100}, False, False)
+
     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
     screen = pygame.display.set_mode([WIDTH, HEIGHT], RESIZABLE)
-    main(my_brain)
+    main(my_population)
+
+"""
+O id dos neurônios não importa, por que em esscência, o que estamos buscando é
+a informação da melhor composição da rede e essa informação já está nas conexões,
+um neurônio pode mudar de posição, mas o que importa é saber se deve haver um novo
+neurônio em dada posição e quais conexões esse neurônio deve ter.
+
+Se pensarmos em uma rede neural como uma estrutura que correlaciona fenômenos de causa e efeito no universo, podemos inferir que achariamos a velocidade da luz colocando o valor de energia nos inputs e massa nos outputs, então toda aquela abstração no meio poderia ser resumida a um número que é a velocidade da luz ao quadrado, a seleção natural iria eliminar as entradas irrelevantes se começarmos com todos os neurônios desconectados e sem neurônios escondidos.
+---
+
+CD = c1 * E/N + c2 * D/N + c3 * W
+
+ajusted_fitness = fitness / num_individuals_specie
+
+average_fitness = Somatorio[(num_individuals_specie[i] * ajusted_fitness[i])] / num_species
+---
+"""
