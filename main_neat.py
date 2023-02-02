@@ -213,6 +213,9 @@ class Connection:
             raise TypeError("The weight must be a float number!")
         self.__weight = weight
     
+    def get_innovation_num(self):
+        return self.__innovation_id
+    
     def change_state(self):
         self.__active = not self.__active
 
@@ -306,6 +309,7 @@ class Brain:
 
         self.specie_num = 0
         self.fitness = 0
+        self.ajusted_fitness = 0
 
         self.__input_neurons = input_neurons
         self.__output_neurons = output_neurons
@@ -440,6 +444,12 @@ class Brain:
                 self.__neuron_list[neuron].activate_neuron()
                 # print(f"{neuron}: {self.__neuron_list[neuron].get_output()}")
     
+    def set_connection_weight(self, weight_list):
+        for connection in self.__connection_list:
+            ids = connection.get_ids()
+            if f"{ids[0]}|{ids[1]}" in weight_list:
+                connection.set_weight(weight_list[f"{ids[0]}|{ids[1]}"])
+    
     def get_outputs(self) -> list:
         output_values = []
         for i in range(self.__input_neurons+1, self.__input_neurons + self.__output_neurons + 1):
@@ -521,25 +531,63 @@ class Brain:
         # formada uma conexão recorrente, se sim, desativar a conexão
         # Verificar se existem conexões recorrentes desativadas e checkar se elas
         # ainda são recorrentes, se não, mudar o estado de recorrente para false
-        pass
 
     def set_fitness(self, fitness):
         self.fitness += fitness
     
     def get_fitness(self) -> float:
         return self.fitness
+    
+    def set_ajusted_fitness(self, ajusted_fitness):
+        self.ajusted_fitness = ajusted_fitness
+    
+    def get_ajusted_fitness(self):
+        return self.ajusted_fitness
+    
+    def set_specie(self, specie_num):
+        self.specie_num = specie_num
+    
+    def get_specie(self) -> int:
+        return self.specie_num
 
     def mutate_weights(self):
         pass
     
 
 class Specie:
-    def __init__(self):
-        self.id = 0
-        self.individuals = []
-        self.fitness = 0
-        self.offspring = 0
+    def __init__(self, id, individuals, fitness=0, offspring=0, gens_since_improved=0):
+        self.id = id
+        self.individuals = individuals
+        self.fitness = fitness
+        self.offspring = offspring
+        self.gens_since_improved = gens_since_improved
+    
+    def add_individual(self, individual_num):
+        self.individuals.append(individual_num)
+    
+    def set_individuals(self, individuals: list):
+        self.individuals = individuals
+    
+    def set_fitness(self, fitness):
+        self.fitness = fitness
+    
+    def get_fitness(self):
+        return self.fitness
+    
+    def set_offspring(self, offspring):
+        self.offspring = offspring
+    
+    def get_offspring(self):
+        return self.offspring
+    
+    def erase_generation(self):
         self.gens_since_improved = 0
+    
+    def increment_generation(self):
+        self.gens_since_improved += 1
+    
+    def get_info(self):
+        return {"id": self.id, "individuals": self.individuals, "fitness": self.fitness, "gens_since_improved": self.gens_since_improved}
 
 
 class Population:
@@ -549,8 +597,14 @@ class Population:
         self.__allow_bias = allow_bias
         self.__allow_recurrency = allow_recurrency
         self.__indivuduals_list = []
+        self.__specie_list = []
         for i in range(self.__population_size):
             self.__indivuduals_list.append(Brain(brain_settings["INPUTS"], brain_settings["HIDDEN"], brain_settings["OUTPUTS"], brain_settings["CONNECTIONS"]))
+        self.generation_count = 0
+        self.threshold = 4.0
+        self.pop_fitness = 0
+        self.max_fitness = 0
+        self.best_individual_id = 0
     
     def set_inputs(self, input_list):
         for individual in self.__indivuduals_list:
@@ -566,6 +620,136 @@ class Population:
             self.__indivuduals_list[individual].set_fitness(fitness_value)
 
     def draw_fittest_network(self):
+        self.__indivuduals_list[self.best_individual_id].draw_network()
+    
+    def get_fitness(self) -> list:
+        fitness_list = []
+        for individual in range(len(self.__indivuduals_list)):
+            fitness_list.append({f"{individual}": self.__indivuduals_list[individual].get_fitness()})
+        return fitness_list
+    
+    def compare_individuals(self, individual_num, nay_individual) -> object:
+        """
+        Retorna objeto contendo o número de disjoint, excess, média dos pesos das conexões em comum e o tamanho do genoma do parente maior
+        """
+        result = {"excess": 0, "disjoint": 0, "genome_size": 0, "weight_mean": 0}
+        connections1 = self.__indivuduals_list[individual_num].get_connection_list()
+        c1_innovation = {connection.get_innovation_num(): connection.get_weight() for connection in connections1}
+        connections2 = self.__indivuduals_list[nay_individual].get_connection_list()
+        c2_innovation = {connection.get_innovation_num(): connection.get_weight() for connection in connections2}
+        common = []
+        disjoint = []
+        for connection in c1_innovation:
+            if connection in c2_innovation:
+                common.append(c1_innovation[connection])
+            else:
+                disjoint.append(c1_innovation[connection])
+        for connection in c2_innovation:
+            if connection not in c1_innovation and connection not in disjoint:
+                disjoint.append(c2_innovation[connection])
+        result["disjoint"] = len(disjoint)
+        result["weight_mean"] = sum(common) / len(common)
+        result["genome_size"] = max(len(connections1), len(connections2))
+        if len(connections1) == result["genome_size"]:
+            result["excess"] = result["genome_size"] - len(connections2)
+        else:
+            result["excess"] = result["genome_size"] - len(connections1)
+        
+        return result
+
+    def speciation(self):
+        if self.generation_count == 0:
+            species = 0
+            species_assigned = []
+            not_assigned_yet = [x for x in range(len(self.__indivuduals_list))]
+            while len(species_assigned) < len(self.__indivuduals_list):
+                species += 1
+                not_assigned_yet = [x for x in range(len(self.__indivuduals_list)) if x not in species_assigned]
+                new_specie = Specie(species, [])
+                individual_num = not_assigned_yet[random.randint(0, len(not_assigned_yet) - 1)]
+                new_specie.add_individual(individual_num)
+                species_assigned.append(individual_num)
+                self.__indivuduals_list[individual_num].set_specie(species)
+                
+                for nay_individual in not_assigned_yet:
+                    if not nay_individual == individual_num:
+                        # CD = c1 * E/N + c2 * D/N + c3 * W
+                        result = self.compare_individuals(individual_num, nay_individual)
+                        CD = (result["excess"] / result["genome_size"]) + (result["disjoint"] / result["genome_size"]) + result["weight_mean"]
+                        if CD <= self.threshold:
+                            new_specie.add_individual(nay_individual)
+                            species_assigned.append(nay_individual)
+                            self.__indivuduals_list[nay_individual].set_specie(species)
+
+                self.__specie_list.append(new_specie)
+        else:
+            species = 0
+            species_assigned = []
+            new_species = []
+            for specie in self.__specie_list:
+                if specie.get_offspring() != 0:
+                    species += 1
+                    individuals = specie.get_info()
+                    choosen_one = individuals["individuals"][random.randint(0, len(individuals["individuals"]) - 1)]
+                    species_assigned.append(choosen_one)
+                    create_new_specie = Specie(species, [choosen_one], individuals["fitness"], individuals["gens_since_improved"])
+                    new_species.append(create_new_specie)
+            self.__specie_list = new_species
+            
+            species = 0
+            not_assigned_yet = [x for x in range(len(self.__indivuduals_list))]
+            while len(species_assigned) < len(self.__indivuduals_list):
+                species += 1
+                not_assigned_yet = [x for x in range(len(self.__indivuduals_list)) if x not in species_assigned]
+                new_specie = Specie(species, [])
+                individual_num = not_assigned_yet[random.randint(0, len(not_assigned_yet) - 1)]
+                new_specie.add_individual(individual_num)
+                species_assigned.append(individual_num)
+                self.__indivuduals_list[individual_num].set_specie(species)
+                
+                for nay_individual in not_assigned_yet:
+                    if not nay_individual == individual_num:
+                        # CD = c1 * E/N + c2 * D/N + c3 * W
+                        result = self.compare_individuals(individual_num, nay_individual)
+                        CD = (result["excess"] / result["genome_size"]) + (result["disjoint"] / result["genome_size"]) + result["weight_mean"]
+                        if CD <= self.threshold:
+                            new_specie.add_individual(nay_individual)
+                            species_assigned.append(nay_individual)
+                            self.__indivuduals_list[nay_individual].set_specie(species)
+
+                self.__specie_list.append(new_specie)
+
+        for specie in self.__specie_list:
+            individuals = specie.get_info()["individuals"]
+            specie_fitness = 0
+            for individual in individuals:
+                ajusted_fitness = self.__indivuduals_list[individual].get_fitness() / len(individuals)
+                self.__indivuduals_list[individual].set_ajusted_fitness(ajusted_fitness)
+                specie_fitness += ajusted_fitness
+            specie_fitness = specie_fitness / len(individuals)
+            if self.generation_count == 0:
+                specie.set_fitness(specie_fitness)
+            else:
+                if specie_fitness > specie.get_fitness():
+                    specie.erase_generation()
+                    specie.set_fitness(specie_fitness)
+                else:
+                    specie.increment_generation()
+                    specie.set_fitness(specie_fitness)
+        
+        species_values = []
+        for specie in self.__specie_list:
+            individuals = specie.get_info()
+            species_values.append(individuals["fitness"] * len(individuals["individuals"]))
+        self.pop_fitness = sum(species_values) / self.__population_size
+
+        for specie in self.__specie_list:
+            individuals = specie.get_info()
+            if individuals["gens_since_improved"] >= 15:
+                specie.set_offspring(0)
+            else:
+                specie.set_offspring((individuals["fitness"] / self.pop_fitness) * len(individuals["individuals"]))
+        
         fittest_id = 0
         max_fitness = 0
         for individual in range(len(self.__indivuduals_list)):
@@ -573,19 +757,85 @@ class Population:
             if individual_fitness > max_fitness:
                 max_fitness = individual_fitness
                 fittest_id = individual
-            # print(f"{individual}: {individual_fitness}")
-        self.__indivuduals_list[fittest_id].draw_network()
+        self.best_individual_id = fittest_id
+        self.max_fitness = max_fitness
     
-    def get_fitness(self) -> list:
-        fitness_list = []
-        for individual in range(len(self.__indivuduals_list)):
-            fitness_list.append({f"{individual}": self.__indivuduals_list[individual].get_fitness()})
-        return fitness_list
+    def get_species(self):
+        list_species = []
+        for specie in self.__specie_list:
+            list_species.append(specie.get_info())
+        return list_species
 
-    def speciation(self):
-        pass
-
+    def pickOne(self, individuals_info: dict, sum_fitness: float):
+        individual_id = -1
+        r = random.uniform(0, sum_fitness)
+        list_keys = list(individuals_info.keys())
+        list_values = list(individuals_info.values())
+        while r > 0:
+            individual_id += 1
+            r -= list_values[individual_id]
+        return list_keys[individual_id]
+    
     def crossover(self):
+        new_individuals = []
+        for i in range(self.__population_size):
+            new_individuals.append(Brain(self.__brain_settings["INPUTS"], self.__brain_settings["HIDDEN"], self.__brain_settings["OUTPUTS"], self.__brain_settings["CONNECTIONS"]))
+
+        crossover_count = 0
+
+        # print(f"Individuals: {len(self.__indivuduals_list)}")
+        # print(f"Species: {len(self.__specie_list)}")
+
+        for specie in self.__specie_list:
+            individuals_info = {}
+            for individual in specie.get_info()["individuals"]:
+                individuals_info[f"{individual}"] = self.__indivuduals_list[individual].get_fitness()
+            sum_fitness = 0
+            for element in individuals_info:
+                sum_fitness += individuals_info[element]
+
+            offspring = int(specie.get_offspring())
+            if f"{self.best_individual_id}" in individuals_info:
+                offspring -= 1
+                new_individuals[0] = self.__indivuduals_list[self.best_individual_id]
+
+
+            i = 0
+            while i < offspring:
+                crossover_count += 1
+                parent1 = self.pickOne(individuals_info, sum_fitness)
+                parent2 = self.pickOne(individuals_info, sum_fitness)
+                if individuals_info[f"{parent1}"] > individuals_info[f"{parent2}"]:
+                    new_individuals[crossover_count] = self.__indivuduals_list[int(parent1)]
+                elif individuals_info[f"{parent1}"] == individuals_info[f"{parent2}"]:
+                    selected = random.randint(1, 2)
+                    if selected == 1:
+                        new_individuals[crossover_count] = self.__indivuduals_list[int(parent1)]
+                    else:
+                        new_individuals[crossover_count] = self.__indivuduals_list[int(parent2)]
+                else:
+                    new_individuals[crossover_count] = self.__indivuduals_list[int(parent2)]
+
+                new_individuals[crossover_count].set_fitness(0)
+                
+                p1_connections = self.__indivuduals_list[int(parent1)].get_connection_list()
+                c1_values = {f"{connection.get_ids()[0]}|{connection.get_ids()[1]}": connection.get_weight() for connection in p1_connections}
+                p2_connections = self.__indivuduals_list[int(parent2)].get_connection_list()
+                c2_values = {f"{connection.get_ids()[0]}|{connection.get_ids()[1]}": connection.get_weight() for connection in p2_connections}
+
+                common = {connection: c1_values[connection] for connection in c1_values if connection in c2_values}
+
+                new_individuals[crossover_count].set_connection_weight(common)
+
+                i += 1
+        
+        # print(len(new_individuals))
+
+        # print(f"Generation: {self.generation_count}")
+        self.__indivuduals_list = new_individuals
+        self.generation_count += 1
+    
+    def mutate(self):
         pass
 
     def get_best_individual_species(self) -> list[Brain]:
@@ -603,10 +853,14 @@ class Population:
 # ----- Run pygame app ------------------------------------------------------------------------
 
 def my_fitness(output_list: list, answers: list) -> float:
-    "output list and answers must be the same size!"
+    "output list and answers must be the same size, and the output of this function must be positive"
     fitness = 0
     for i in range(len(output_list)):
-        fitness += output_list[i] - answers[i]
+        if answers[i] >= 0.5:
+            answer = 1
+        else:
+            answer = 0
+        fitness += 1 - abs(output_list[i] - answer)
     return fitness
 
 inputs_and_answers = {
@@ -619,23 +873,30 @@ inputs_and_answers = {
 def main(population):
     global running, screen
     pygame.init()
-
-    for input_value in inputs_and_answers:
-        population.set_inputs(inputs_and_answers[input_value][0])
-        population.run_simulation()
-        population.calculate_fitness(my_fitness, inputs_and_answers[input_value][1])
+    
+    for i in range(100):
+        for input_value in inputs_and_answers:
+            population.set_inputs(inputs_and_answers[input_value][0])
+            population.run_simulation()
+            population.calculate_fitness(my_fitness, inputs_and_answers[input_value][1])
+        population.speciation()
+        population.crossover()
+        # population.mutate()
     # brain.load_inputs([99, 99, 92, 94, 95, 91, 95])
     # brain_layers = brain.get_layers()
     # logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
     # brain.run_network()
     # brain.add_connection()
-    max_fit = 0
-    for individual_fitness in population.get_fitness():
-        fit_value = list(individual_fitness.values())[0]
-        if fit_value > max_fit:
-            max_fit = fit_value
-        print(individual_fitness)
-    print(max_fit)
+    # max_fit = 0
+    # for individual_fitness in population.get_fitness():
+    #     fit_value = list(individual_fitness.values())[0]
+    #     if fit_value > max_fit:
+    #         max_fit = fit_value
+        # print(individual_fitness)
+    # print(max_fit)
+
+    # for specie in population.get_species():
+        # print(specie)
 
     while running:
         clock.tick(60)
@@ -652,7 +913,7 @@ def main(population):
 if __name__ == '__main__':
     running = True
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
-    my_population = Population(500, {"INPUTS": 2, "HIDDEN": 0, "OUTPUTS": 1, "CONNECTIONS": 100}, False, False)
+    my_population = Population(50, {"INPUTS": 2, "HIDDEN": 0, "OUTPUTS": 1, "CONNECTIONS": 100}, False, False)
 
     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
     screen = pygame.display.set_mode([WIDTH, HEIGHT], RESIZABLE)
@@ -667,10 +928,11 @@ neurônio em dada posição e quais conexões esse neurônio deve ter.
 Se pensarmos em uma rede neural como uma estrutura que correlaciona fenômenos de causa e efeito no universo, podemos inferir que achariamos a velocidade da luz colocando o valor de energia nos inputs e massa nos outputs, então toda aquela abstração no meio poderia ser resumida a um número que é a velocidade da luz ao quadrado, a seleção natural iria eliminar as entradas irrelevantes se começarmos com todos os neurônios desconectados e sem neurônios escondidos.
 ---
 
-CD = c1 * E/N + c2 * D/N + c3 * W
-
-ajusted_fitness = fitness / num_individuals_specie
-
-average_fitness = Somatorio[(num_individuals_specie[i] * ajusted_fitness[i])] / num_species
----
+- [X] Especiação
+- [ ] Crossover
+- [ ] Mutação
+- [ ] Threads
+- [ ] Testes de performance
+- [ ] Bias
+- [ ] Conexões recorrentes
 """
