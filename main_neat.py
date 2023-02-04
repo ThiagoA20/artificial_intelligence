@@ -983,22 +983,6 @@ def main(population):
         population.speciation()
         population.crossover()
         population.mutate()
-        # print(population.max_fitness)
-    # brain.load_inputs([99, 99, 92, 94, 95, 91, 95])
-    # brain_layers = brain.get_layers()
-    # logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
-    # brain.run_network()
-    # brain.add_connection()
-    # max_fit = 0
-    # for individual_fitness in population.get_fitness():
-    #     fit_value = list(individual_fitness.values())[0]
-    #     if fit_value > max_fit:
-    #         max_fit = fit_value
-        # print(individual_fitness)
-    # print(max_fit)
-
-    # for specie in population.get_species():
-    #     print(specie)
 
     while running:
         clock.tick(60)
@@ -1050,9 +1034,10 @@ Se pensarmos em uma rede neural como uma estrutura que correlaciona fenômenos d
 
 - [X] Especiação
 - [X] Crossover
-- [ ] Mutação
-- [ ] Ajustar threshold e fitness
+- [X] Mutação
 - [ ] Threads
+- [ ] Ajustar threshold e fitness
+- [ ] Corrigir os bugs
 - [ ] Testes de performance
 - [ ] Bias
 - [ ] Conexões recorrentes
