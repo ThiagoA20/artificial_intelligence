@@ -96,9 +96,12 @@ def draw_neuron(position, type, radius):
     else:
         pygame.draw.circle(screen, INPUT_COLOR, position, radius, 2)
 
-def draw_connection(position1, position2):
+def draw_connection(position1, position2, color=""):
     global screen
-    pygame.draw.line(screen, (150, 150, 150), position1, position2)
+    if color == "red":
+        pygame.draw.line(screen, (255, 0, 0), position1, position2)
+    else:
+        pygame.draw.line(screen, (150, 150, 150), position1, position2)
 
 # ----- Activation functions -------------------------------------------------------------------
 
@@ -145,6 +148,7 @@ class Neuron:
         self.__activation = activation
         self.__sum_input = 0
         self.__sum_output = 0
+        self.__active = True
     
     def get_neuron_info(self) -> dict:
         return {"id": self.__neuron_id, "type": self.__neuron_type, "layer": self.__neuron_layer, "Sum result": self.__sum_input, "Activation result": self.__sum_output}
@@ -170,13 +174,19 @@ class Neuron:
     def calculate_sum(self, connection_results: list):
         self.__sum_input = sum(connection_results)
     
+    def change_state(self):
+        self.__active = not self.__active
+    
+    def is_active(self):
+        return self.__active
+    
     def activate_neuron(self):
         if (self.__neuron_type == 1):
             self.__sum_output = self.__sum_input
-            self.__sum_input = 0
+            # self.__sum_input = 0
         else:
             self.__sum_output = self.__activation(self.__sum_input)
-            self.__sum_input = 0
+            # self.__sum_input = 0
 
 
 class Connection:
@@ -207,6 +217,12 @@ class Connection:
     
     def is_active(self) -> bool:
         return self.__active
+
+    def is_recurrent(self):
+        return self.__is_Recurrent
+    
+    def change_recurrency(self):
+        self.__is_Recurrent = not self.__is_Recurrent
 
     def set_weight(self, weight: float):
         if not isinstance(weight, float):
@@ -327,7 +343,7 @@ class Brain:
         neuron_numbers = [(neuron.get_id(), neuron.get_type()) for neuron in self.__neuron_list]
         logger.debug(f"Neuron numbers/type: {neuron_numbers}")
     
-    def set_layers(self): 
+    def set_layers(self, draw=False): 
         layers = {}
         connection_ids_list = []
         for connection in self.__connection_list:
@@ -343,7 +359,7 @@ class Brain:
             neuron_id = str(neuron.get_id())
             if not neuron_id == '0':
                 neuron.set_layer(layers[neuron_id])
-        if self.__layers == {}:
+        if self.__layers == {} or draw:
             self.get_layers()
     
     def get_layers(self) -> dict:
@@ -373,8 +389,7 @@ class Brain:
 
         neuron_position = {}
         """Ajust set layers to always start with some content to avoid check all those if statements"""
-        if self.__layers == {}:
-            self.set_layers()
+        self.set_layers(draw=True)
         layer_values = list(self.__layers.values())
 
         x_align = (c_width - (container_w * len(self.__layers))) / (len(self.__layers) + 1)
@@ -404,13 +419,22 @@ class Brain:
                 neuron_opt.draw()
 
         for connection in self.__connection_list:
-            connection_id = connection.get_ids()
-            n1_pos = neuron_position[connection_id[0]]
-            n2_pos = neuron_position[connection_id[1]]
-            draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]))
+            if connection.is_active():
+                connection_id = connection.get_ids()
+                n1_pos = neuron_position[connection_id[0]]
+                n2_pos = neuron_position[connection_id[1]]
+                draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]))
 
-            connection_weight = Label(font, f"{round(connection.get_weight(), 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
-            connection_weight.draw()
+                connection_weight = Label(font, f"{round(connection.get_weight(), 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
+                connection_weight.draw()
+            else:
+                connection_id = connection.get_ids()
+                n1_pos = neuron_position[connection_id[0]]
+                n2_pos = neuron_position[connection_id[1]]
+                draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]), "red")
+
+                connection_weight = Label(font, f"{round(connection.get_weight(), 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
+                connection_weight.draw()
 
     def get_neuron_list(self) -> list[Neuron]:
         return self.__neuron_list
@@ -437,12 +461,10 @@ class Brain:
                 input_list = []
                 for connection in self.__connection_list:
                     connection_ids = connection.get_ids()
-                    if connection_ids[1] == neuron:
+                    if connection_ids[1] == neuron and not connection.is_recurrent():
                         input_list.append(self.__neuron_list[connection_ids[0]].get_output() * connection.get_weight())
-                        # print(f"{connection_ids}: {self.__neuron_list[connection_ids[0]].get_output()}")
                 self.__neuron_list[neuron].calculate_sum(input_list)
                 self.__neuron_list[neuron].activate_neuron()
-                # print(f"{neuron}: {self.__neuron_list[neuron].get_output()}")
     
     def set_connection_weight(self, weight_list):
         for connection in self.__connection_list:
@@ -457,26 +479,54 @@ class Brain:
         # print(output_values)
         return output_values
 
-    def add_connection(self):
+    def mutate_connection_weights(self, prob):
+        for connection in self.__connection_list:
+            get_prob = random.uniform(0.0, 1.0)
+            if get_prob <= prob:
+                update_value = random.uniform(0.0, 1.0)
+                if update_value <= 0.9:
+                    previous_weight = connection.get_weight()
+                    connection.set_weight(random.uniform(previous_weight * 0.8, previous_weight * 1.2))
+                else:
+                    connection.set_weight(random.uniform(-20, 20))
+
+    def mutate_connection_state(self, prob):
+        for connection in self.__connection_list:
+            get_prob = random.uniform(0.0, 1.0)
+            if get_prob <= prob:
+                if not connection.is_recurrent():
+                    connection.change_state()
+
+    def mutate_node_state(self, prob):
+        for neuron_num in range(self.__input_neurons + self.__output_neurons + 1, len(self.__neuron_list)):
+            get_prob = random.uniform(0.0, 1.0)
+            if get_prob <= prob:
+                neuron_id = self.__neuron_list[neuron_num].get_id()
+                self.__neuron_list[neuron_num].change_state()
+                for connection in self.__connection_list:
+                    connection_ids = connection.get_ids()
+                    if connection_ids[0] == neuron_id or connection_ids[1] == neuron_id and not connection.is_recurrent():
+                        connection.change_state()
+
+    def check_recurrent_connections(self):
+        neuron_layers = {}
+        for neuron in range(len(self.__neuron_list)):
+            neuron_layers[f"{self.__neuron_list[neuron].get_id()}"] = self.__neuron_list[neuron].get_layer()
+        
+        for connection in self.__connection_list:
+            connection_ids = connection.get_ids()
+            if neuron_layers[f"{connection_ids[1]}"] <= neuron_layers[f"{connection_ids[0]}"]:
+                if not connection.is_recurrent():
+                    connection.change_recurrency()
+                if connection.is_active():
+                    connection.change_state()
+            else:
+                if connection.is_recurrent():
+                    connection.change_recurrency()
+
+    def add_connection(self, allow_recurrency=False):
         global GENOME_HASHTABLE, INNOVATION_NUM
-        """
-        Dois neurônios na rede são escolhidos aleatoriamente
-        
-        Validação:
-        - Não pode já haver uma conexão entre os neurônios
-        - Não pode escolher duas vezes o mesmo neurônio
-        - Não pode conectar dois neurônios na mesma camada
-        - Não pode conectar um neurônio de uma camada maior com um neurônio em uma camada menor, a não ser que conexões recorrentes sejam permitidas
-        - O peso para a nova conexão é definido como um valor aleatório
-        - O innovation id é pego da tabela se já existir, se não, é adicionado mais um no contador e definido o valor na tabela
-        - A conexão é definida como ativada
-        - Como desativar uma conexão?
-        
-        Probabilidade:
-        - Para o XOR, há 5% de chance de uma conexão ser adicionada depois do crossover
-        - Permitir 20 tentativas de conseguir um par de nodos válidos para criar a conexão que não quebra as regras de validação
-        - Se há uma conexão entre dois neurônios e está desativada, há 25% de chance de ela ser reativada
-        """
+
         self.set_layers()
         new_connection = None
         attempts = 10
@@ -488,7 +538,7 @@ class Brain:
             n1 = valid_n1_set[random.randint(0, len(valid_n1_set) - 1)]
             n1_layer = self.__neuron_list[n1].get_layer()
             valid_n2_set = []
-            for camada in range(n1_layer, len(self.__layers)):
+            for camada in range(n1_layer, len(self.__layers)): ########################## Talvez seja necessário adicionar +1 na camada para que não crie uma conexão recorrente
                 for neuron in list(self.__layers.values())[camada]:
                     valid_n2_set.append(neuron)
             n2 = valid_n2_set[random.randint(0, len(valid_n2_set) - 1)]
@@ -507,30 +557,41 @@ class Brain:
             attempts -= 1
         if new_connection != None:
             self.__connection_list.append(new_connection)
-        
-        # Criar conexões recorrentes
 
     def add_node(self):
-        """
-        Uma conexão foward ativada é escolhida aleatoriamente
-        
-        - A conexão é desativada
-        - Um novo neurônio é colocado no array de neurônios
-        - Duas novas conexões são adicionadas no array de conexões, uma conectada com a camada anterior e o novo neurônio e a outra conectada com o novo neurônio e a camada posterior
-        - Uma das conexões recebe como valor para o peso o valor da conexão que foi desativada e a outra recebe um novo valor aleatório
-        - As camadas são redefinidas
-        - Se um neurônio surgir em um ponto de modo que faça uma conexão se tornar recorrente, então o valor de isRecurrent é definido como verdadeiro e a conexão é desativada, o contrário também é válido se uma conexão que antes era recorrente virar foward então é definido que ela não é recorrente mudando o valor de isRecurrent para falso
-        """
+        global GENOME_HASHTABLE, INNOVATION_NUM
+
         self.set_layers()
-        selected_connection = self.__connection_list[random.randint(0, len(self.__connection_list) - 1)]
-        selected_connection.change_state()
-        new_neuron = Neuron()
-        return selected_connection.get_info()
-        # self.set_layers()
-        # Depois de adicionar o neurônio, verificar cada camada para ver se foi
-        # formada uma conexão recorrente, se sim, desativar a conexão
-        # Verificar se existem conexões recorrentes desativadas e checkar se elas
-        # ainda são recorrentes, se não, mudar o estado de recorrente para false
+        ative_connection = False
+        attempts = 5
+        while not ative_connection and attempts > 0:
+            selected_connection = self.__connection_list[random.randint(0, len(self.__connection_list) - 1)]
+            if selected_connection.is_active():
+                ative_connection = True
+                selected_connection.change_state()
+                neuron_id = len(self.__neuron_list)
+                new_neuron = Neuron(neuron_id, 0, 0, sigmoid)
+
+                connection_ids = selected_connection.get_ids()
+
+                if f"{connection_ids[0]}|{neuron_id}" in GENOME_HASHTABLE:
+                    new_connection1 = Connection(GENOME_HASHTABLE[f"{connection_ids[0]}|{neuron_id}"], connection_ids[0], neuron_id, 1.0, True)
+                else:
+                    INNOVATION_NUM += 1
+                    new_connection1 = Connection(INNOVATION_NUM, connection_ids[0], neuron_id, 1.0, True)
+                
+                if f"{neuron_id}|{connection_ids[1]}" in GENOME_HASHTABLE:
+                    new_connection2 = Connection(GENOME_HASHTABLE[f"{neuron_id}|{connection_ids[1]}"], neuron_id, connection_ids[1], selected_connection.get_weight(), True)
+                else:
+                    INNOVATION_NUM += 1
+                    new_connection2 = Connection(INNOVATION_NUM, neuron_id, connection_ids[1], selected_connection.get_weight(), True)
+                
+                self.__neuron_list.append(new_neuron)
+                self.__connection_list.append(new_connection1)
+                self.__connection_list.append(new_connection2)
+            attempts -= 1
+        self.set_layers()
+        self.check_recurrent_connections()
 
     def set_fitness(self, fitness):
         self.fitness += fitness
@@ -550,9 +611,6 @@ class Brain:
     def get_specie(self) -> int:
         return self.specie_num
 
-    def mutate_weights(self):
-        pass
-    
 
 class Specie:
     def __init__(self, id, individuals, fitness=0, offspring=0, gens_since_improved=0):
@@ -591,9 +649,10 @@ class Specie:
 
 
 class Population:
-    def __init__(self, popsize: int, brain_settings: dict, allow_bias: bool, allow_recurrency: bool):
+    def __init__(self, popsize: int, brain_settings: dict, mutate_probs: dict, allow_bias: bool, allow_recurrency: bool):
         self.__population_size = popsize
         self.__brain_settings = brain_settings
+        self.__mutate_probs = mutate_probs
         self.__allow_bias = allow_bias
         self.__allow_recurrency = allow_recurrency
         self.__indivuduals_list = []
@@ -621,7 +680,38 @@ class Population:
 
     def draw_fittest_network(self):
         self.__indivuduals_list[self.best_individual_id].draw_network()
-    
+        individuals_label = Label(font, f"Individuals: {len(self.__indivuduals_list)}", (150, 150, 150), (30, 30))
+        individuals_label.draw()
+        species_label = Label(font, f"Species: {len(self.__indivuduals_list)}", (150, 150, 150), (30, 60))
+        species_label.draw()
+        generation_label = Label(font, f"Generation: {self.generation_count}", (150, 150, 150), (30, 90))
+        generation_label.draw()
+        best_individual_label = Label(font, f"Best individual: {self.best_individual_id}", (150, 150, 150), (30, 120))
+        best_individual_label.draw()
+        fitness_label = Label(font, f"Best Fitness: {self.max_fitness}", (150, 150, 150), (30, 150))
+        fitness_label.draw()
+
+        connection_weight_label = Label(font, f"Connection weight prob: {self.__mutate_probs['connection_weight'] * 100}%", (150, 150, 150), (30, 390))
+        connection_weight_label.draw()
+        add_connection_label = Label(font, f"Add connection prob: {self.__mutate_probs['add_connection'] * 100}%", (150, 150, 150), (30, 420))
+        add_connection_label.draw()
+        add_node_label = Label(font, f"Add node prob: {self.__mutate_probs['add_node'] * 100}%", (150, 150, 150), (30, 450))
+        add_node_label.draw()
+        connection_state_label = Label(font, f"Connection state prob: {self.__mutate_probs['connection_state'] * 100}%", (150, 150, 150), (30, 480))
+        connection_state_label.draw()
+        node_state_label = Label(font, f"Node state prob: {self.__mutate_probs['node_state'] * 100}%", (150, 150, 150), (30, 510))
+        node_state_label.draw()
+        allow_bias_label = Label(font, f"Allow bias: {self.__allow_bias}", (150, 150, 150), (30, 540))
+        allow_bias_label.draw()
+        allow_recurrency_label = Label(font, f"Allow recurrency: {self.__allow_recurrency}", (150, 150, 150), (30, 570))
+        allow_recurrency_label.draw()
+        input_neurons_label = Label(font, f"Start Input neurons: {self.__brain_settings['INPUTS']}", (150, 150, 150), (30, 600))
+        input_neurons_label.draw()
+        hidden_neurons_label = Label(font, f"Start hidden neurons: {self.__brain_settings['HIDDEN']}", (150, 150, 150), (30, 630))
+        hidden_neurons_label.draw()
+        output_neurons_label = Label(font, f"Start Outputneurons: {self.__brain_settings['OUTPUTS']}", (150, 150, 150), (30, 660))
+        output_neurons_label.draw()
+
     def get_fitness(self) -> list:
         fitness_list = []
         for individual in range(len(self.__indivuduals_list)):
@@ -828,15 +918,26 @@ class Population:
                 new_individuals[crossover_count].set_connection_weight(common)
 
                 i += 1
-        
-        # print(len(new_individuals))
 
         # print(f"Generation: {self.generation_count}")
         self.__indivuduals_list = new_individuals
         self.generation_count += 1
     
     def mutate(self):
-        pass
+        for individual in self.__indivuduals_list:
+            individual.mutate_connection_weights(self.__mutate_probs["connection_weight"])
+
+            # add_connection_prob = random.uniform(0.0, 1.0)
+            # if add_connection_prob <= self.__mutate_probs["add_connection"]:
+                # individual.add_connection(self.__allow_recurrency)
+            
+            add_node_prob = random.uniform(0.0, 1.0)
+            if add_node_prob <= self.__mutate_probs["add_node"]:
+                individual.add_node()
+            
+            # individual.mutate_connection_state(self.__mutate_probs["connection_state"])
+
+            # individual.mutate_node_state(self.__mutate_probs["node_state"])
 
     def get_best_individual_species(self) -> list[Brain]:
         pass
@@ -864,10 +965,10 @@ def my_fitness(output_list: list, answers: list) -> float:
     return fitness
 
 inputs_and_answers = {
-    "IP1": [[1, 1], [0]],
+    "IP1": [[0, 0], [0]],
     "IP2": [[1, 0], [1]],
     "IP3": [[0, 1], [1]],
-    "IP4": [[0, 0], [0]]
+    "IP4": [[1, 1], [0]]
 }
 
 def main(population):
@@ -881,7 +982,8 @@ def main(population):
             population.calculate_fitness(my_fitness, inputs_and_answers[input_value][1])
         population.speciation()
         population.crossover()
-        # population.mutate()
+        population.mutate()
+        # print(population.max_fitness)
     # brain.load_inputs([99, 99, 92, 94, 95, 91, 95])
     # brain_layers = brain.get_layers()
     # logger.debug(f"Total layers: {len(brain_layers)} -> Layers: {brain_layers}")
@@ -896,7 +998,7 @@ def main(population):
     # print(max_fit)
 
     # for specie in population.get_species():
-        # print(specie)
+    #     print(specie)
 
     while running:
         clock.tick(60)
@@ -913,7 +1015,25 @@ def main(population):
 if __name__ == '__main__':
     running = True
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
-    my_population = Population(50, {"INPUTS": 2, "HIDDEN": 0, "OUTPUTS": 1, "CONNECTIONS": 100}, False, False)
+
+    my_population = Population(
+        popsize=50, 
+        brain_settings={
+            "INPUTS": 2,
+            "HIDDEN": 0,
+            "OUTPUTS": 1,
+            "CONNECTIONS": 100
+        }, 
+        mutate_probs={
+            "connection_weight": 0.8,
+            "add_connection": 0.05, 
+            "add_node": 0.0005,
+            "connection_state": 0.01,
+            "node_state": 0.01
+        }, 
+        allow_bias=False, 
+        allow_recurrency=False
+    )
 
     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
     screen = pygame.display.set_mode([WIDTH, HEIGHT], RESIZABLE)
@@ -929,8 +1049,9 @@ Se pensarmos em uma rede neural como uma estrutura que correlaciona fenômenos d
 ---
 
 - [X] Especiação
-- [ ] Crossover
+- [X] Crossover
 - [ ] Mutação
+- [ ] Ajustar threshold e fitness
 - [ ] Threads
 - [ ] Testes de performance
 - [ ] Bias
