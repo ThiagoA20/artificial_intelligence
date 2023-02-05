@@ -2,106 +2,10 @@ import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import math
 import random
-import pygame
-from pygame.locals import *
 import logging
-import time
+import global_vars
 
 logger = logging.getLogger(__name__)
-
-# ----- Pygame Draw network --------------------------------------------------------------------
-
-WIDTH = 1280
-HEIGHT = 720    
-ICON = pygame.image.load('D:\\projects\\enigma\\common\\graphical_interface\\brain_analyser\\assets\\ba_icon.png')
-pygame.display.set_icon(ICON)
-clock = pygame.time.Clock()
-pygame.display.set_caption('Brain analyser')
-running = False
-
-INPUT_COLOR = (255, 25, 25)
-HIDDEN_COLOR = (75, 75, 75)
-OUTPUT_COLOR = (25, 255, 25)
-
-pygame.font.init()
-font = pygame.font.SysFont('rockwell', 17)
-big_font = pygame.font.SysFont('rockwell', 21)
-
-def newPosition(posy, posx, width1, height1, width2, height2):
-    proportion_y = posy / height1
-    proportion_x = posx / width1
-
-    return (round(proportion_x * width2), round(proportion_y * height2))
-
-class DrawItem:
-    def __init__(self, posx, posy, width, height, color, target=None, center=True):
-        if center:
-            self.x = posx - width/2
-            self.y = posy - height/2
-        else:
-            self.x = posx
-            self.y = posy
-        self.w = width
-        self.h = height
-        self.rect = pygame.Rect(posx, posy, width, height)
-        self.color = color
-        self.target = target
-
-    def draw(self, item_posx, item_posy, width, height):
-        pygame.draw.rect(screen, self.color, (item_posx, item_posy, width, height), 3)
-    
-    def check_event(self, posx, posy):
-        pass
-
-    def react_event(self):
-        pass
-
-class Label(DrawItem):
-    def __init__(self, font, text, color, position, anchor="left"):
-        self.image = font.render(text, 1, color)
-        self.text = text
-        self.color = color
-        self.cursor = pygame.SYSTEM_CURSOR_HAND
-        self.rect = self.image.get_rect()
-        self.position = position
-        self.anchor = anchor
-        self.rect.top = position[1]
-        self.rect.right = position[0]
-        # setattr(self.rect, anchor, position)
-
-    def draw(self):
-        if HEIGHT > 900:
-            self.image = big_font.render(self.text, 1, self.color)
-            self.rect = self.image.get_rect()
-        else:
-            self.image = font.render(self.text, 1, self.color)
-            self.rect = self.image.get_rect()
-        np = newPosition(self.position[1], self.position[0], 1280, 720, WIDTH, HEIGHT)
-        if self.anchor == "left":
-            txt_pos = pygame.Rect(np[0], np[1], self.rect.w, self.rect.h)
-        else:
-            txt_pos = pygame.Rect(np[0], np[1], self.rect.w, self.rect.h)
-            txt_pos.right = np[0]
-        screen.blit(self.image, txt_pos)
-    
-    def getRect(self):
-        return self.rect
-
-def draw_neuron(position, type, radius):
-    global screen
-    if type == "HIDDEN":
-        pygame.draw.circle(screen, HIDDEN_COLOR, position, radius)
-    elif type == "OUTPUT":
-        pygame.draw.circle(screen, OUTPUT_COLOR, position, radius, 2)
-    else:
-        pygame.draw.circle(screen, INPUT_COLOR, position, radius, 2)
-
-def draw_connection(position1, position2, color=""):
-    global screen
-    if color == "red":
-        pygame.draw.line(screen, (255, 0, 0), position1, position2)
-    else:
-        pygame.draw.line(screen, (150, 150, 150), position1, position2)
 
 # ----- Activation functions -------------------------------------------------------------------
 
@@ -377,64 +281,23 @@ class Brain:
         return dict(sorted(layers.items()))
     
     def draw_network(self):
-        global screen, font
-        start_x = 340
-        start_y = 60
-        c_width = 600
-        c_height = 600
-
-        """Make it proportional to the width and height of the network canvas"""
-        n_radius = 20
-        container_w = 60
-
-        neuron_position = {}
-        """Ajust set layers to always start with some content to avoid check all those if statements"""
+        """
+        - [ ] Layers --------- neuron numbers
+        - [X] Connections ---- is_active, weight
+        {'1|4': [False, 3.251], '1|5': [True, 5.123], '5|4': [True, 2.152], '2|4': [True, 1.321], '4|3': [True, 1.742]
+        - [X] Neurons -------- output
+        {'1': [1], '2': [1], '3': [0], '4': [0], '5': [0]}
+        """
         self.set_layers(draw=True)
-        layer_values = list(self.__layers.values())
 
-        x_align = (c_width - (container_w * len(self.__layers))) / (len(self.__layers) + 1)
-        """Set the option as a boolean to draw the canvas when needed for debug"""
-        # pygame.draw.rect(screen, (255, 255, 0), (start_x, start_y, c_width, c_height), 3)
-        for layer_num in range(len(self.__layers)):
-            # pygame.draw.rect(screen, (255, 255, 255), (start_x + x_align * (layer_num + 1) + container_w * layer_num, start_y, container_w, c_height), 3)
-            y_align = (c_height - (n_radius * len(layer_values[layer_num]))) / (len(layer_values[layer_num]) + 1)
-            for neuron_num in range(len(layer_values[layer_num])):
-                pos_x = start_x + container_w/2 + x_align * (layer_num + 1) + container_w * layer_num
-                pos_y = start_y + n_radius/2 + y_align * (neuron_num + 1) + n_radius * neuron_num
+        network = [
+            self.__layers,
+            {f"{connection.get_ids()[0]}|{connection.get_ids()[1]}": [connection.is_active(), connection.get_weight()] for connection in self.__connection_list},
+            {f"{neuron.get_id()}": [neuron.get_output()] for neuron in self.__neuron_list if neuron.get_id() != 0}
+        ]
 
-                neuron_position[layer_values[layer_num][neuron_num]] = (pos_x, pos_y)
-
-                if layer_num == 0:
-                    neuron_type = "INPUT"
-                elif layer_num == len(self.__layers) - 1:
-                    neuron_type = "OUTPUT"
-                else:
-                    neuron_type = "HIDDEN"
-
-                draw_neuron((pos_x, pos_y), neuron_type, n_radius)
-
-                neuron_id = Label(font, f"{layer_values[layer_num][neuron_num]}", (255, 255, 255), (pos_x - n_radius/2.5, pos_y - n_radius/2))
-                neuron_id.draw()
-                neuron_opt = Label(font, f"{round(self.__neuron_list[layer_values[layer_num][neuron_num]].get_output(), 4)}", (255, 165, 0), (pos_x + n_radius, pos_y - n_radius * 2))
-                neuron_opt.draw()
-
-        for connection in self.__connection_list:
-            if connection.is_active():
-                connection_id = connection.get_ids()
-                n1_pos = neuron_position[connection_id[0]]
-                n2_pos = neuron_position[connection_id[1]]
-                draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]))
-
-                connection_weight = Label(font, f"{round(connection.get_weight(), 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
-                connection_weight.draw()
-            else:
-                connection_id = connection.get_ids()
-                n1_pos = neuron_position[connection_id[0]]
-                n2_pos = neuron_position[connection_id[1]]
-                draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]), "red")
-
-                connection_weight = Label(font, f"{round(connection.get_weight(), 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
-                connection_weight.draw()
+        with global_vars.network_lock:
+            global_vars.network = network
 
     def get_neuron_list(self) -> list[Neuron]:
         return self.__neuron_list
@@ -680,37 +543,25 @@ class Population:
 
     def draw_fittest_network(self):
         self.__indivuduals_list[self.best_individual_id].draw_network()
-        individuals_label = Label(font, f"Individuals: {len(self.__indivuduals_list)}", (150, 150, 150), (30, 30))
-        individuals_label.draw()
-        species_label = Label(font, f"Species: {len(self.__indivuduals_list)}", (150, 150, 150), (30, 60))
-        species_label.draw()
-        generation_label = Label(font, f"Generation: {self.generation_count}", (150, 150, 150), (30, 90))
-        generation_label.draw()
-        best_individual_label = Label(font, f"Best individual: {self.best_individual_id}", (150, 150, 150), (30, 120))
-        best_individual_label.draw()
-        fitness_label = Label(font, f"Best Fitness: {self.max_fitness}", (150, 150, 150), (30, 150))
-        fitness_label.draw()
-
-        connection_weight_label = Label(font, f"Connection weight prob: {self.__mutate_probs['connection_weight'] * 100}%", (150, 150, 150), (30, 390))
-        connection_weight_label.draw()
-        add_connection_label = Label(font, f"Add connection prob: {self.__mutate_probs['add_connection'] * 100}%", (150, 150, 150), (30, 420))
-        add_connection_label.draw()
-        add_node_label = Label(font, f"Add node prob: {self.__mutate_probs['add_node'] * 100}%", (150, 150, 150), (30, 450))
-        add_node_label.draw()
-        connection_state_label = Label(font, f"Connection state prob: {self.__mutate_probs['connection_state'] * 100}%", (150, 150, 150), (30, 480))
-        connection_state_label.draw()
-        node_state_label = Label(font, f"Node state prob: {self.__mutate_probs['node_state'] * 100}%", (150, 150, 150), (30, 510))
-        node_state_label.draw()
-        allow_bias_label = Label(font, f"Allow bias: {self.__allow_bias}", (150, 150, 150), (30, 540))
-        allow_bias_label.draw()
-        allow_recurrency_label = Label(font, f"Allow recurrency: {self.__allow_recurrency}", (150, 150, 150), (30, 570))
-        allow_recurrency_label.draw()
-        input_neurons_label = Label(font, f"Start Input neurons: {self.__brain_settings['INPUTS']}", (150, 150, 150), (30, 600))
-        input_neurons_label.draw()
-        hidden_neurons_label = Label(font, f"Start hidden neurons: {self.__brain_settings['HIDDEN']}", (150, 150, 150), (30, 630))
-        hidden_neurons_label.draw()
-        output_neurons_label = Label(font, f"Start Outputneurons: {self.__brain_settings['OUTPUTS']}", (150, 150, 150), (30, 660))
-        output_neurons_label.draw()
+        network_info = {
+            "individuals": len(self.__indivuduals_list),
+            "species": len(self.__specie_list),
+            "generation": self.generation_count,
+            "best_individual": self.best_individual_id,
+            "best_fitness": self.max_fitness,
+            "connection_weight": self.__mutate_probs['connection_weight'] * 100,
+            "add_connection": self.__mutate_probs['add_connection'] * 100,
+            "add_node": self.__mutate_probs['add_node'] * 100,
+            "connection_state": self.__mutate_probs['connection_state'] * 100,
+            "node_state": self.__mutate_probs['node_state'] * 100,
+            "allow_bias": self.__allow_bias,
+            "allow_recurrency": self.__allow_recurrency,
+            "input_neurons": self.__brain_settings['INPUTS'],
+            "hidden_neurons": self.__brain_settings['HIDDEN'],
+            "output_neurons": self.__brain_settings['OUTPUTS']
+        }
+        with global_vars.network_info_lock:
+            global_vars.network_info = network_info
 
     def get_fitness(self) -> list:
         fitness_list = []
@@ -951,77 +802,9 @@ class Population:
     def load_population(self):
         pass
 
-# ----- Run pygame app ------------------------------------------------------------------------
-
-def my_fitness(output_list: list, answers: list) -> float:
-    "output list and answers must be the same size, and the output of this function must be positive"
-    fitness = 0
-    for i in range(len(output_list)):
-        if answers[i] >= 0.5:
-            answer = 1
-        else:
-            answer = 0
-        fitness += 1 - abs(output_list[i] - answer)
-    return fitness
-
-inputs_and_answers = {
-    "IP1": [[0, 0], [0]],
-    "IP2": [[1, 0], [1]],
-    "IP3": [[0, 1], [1]],
-    "IP4": [[1, 1], [0]]
-}
-
-def main(population):
-    global running, screen
-    pygame.init()
-    
-    for i in range(100):
-        for input_value in inputs_and_answers:
-            population.set_inputs(inputs_and_answers[input_value][0])
-            population.run_simulation()
-            population.calculate_fitness(my_fitness, inputs_and_answers[input_value][1])
-        population.speciation()
-        population.crossover()
-        population.mutate()
-
-    while running:
-        clock.tick(60)
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                running = False
-        screen.fill((25, 25, 25))
-        population.draw_fittest_network()
-
-        pygame.display.update()
-    
-    pygame.quit()
-
 if __name__ == '__main__':
-    running = True
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
-
-    my_population = Population(
-        popsize=50, 
-        brain_settings={
-            "INPUTS": 2,
-            "HIDDEN": 0,
-            "OUTPUTS": 1,
-            "CONNECTIONS": 100
-        }, 
-        mutate_probs={
-            "connection_weight": 0.8,
-            "add_connection": 0.05, 
-            "add_node": 0.0005,
-            "connection_state": 0.01,
-            "node_state": 0.01
-        }, 
-        allow_bias=False, 
-        allow_recurrency=False
-    )
-
     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
-    screen = pygame.display.set_mode([WIDTH, HEIGHT], RESIZABLE)
-    main(my_population)
 
 """
 O id dos neurônios não importa, por que em esscência, o que estamos buscando é
