@@ -4,15 +4,6 @@ from draw_network import *
 from main_neat import *
 import global_vars
 
-def counter():
-    for i in range(100):
-        time.sleep(0.1)
-        with global_vars.counter_lock:
-            global_vars.counter = i
-            print(global_vars.counter)
-    with global_vars.running_lock:
-        global_vars.running = False
-
 
 def my_fitness(output_list: list, answers: list) -> float:
     "output list and answers must be the same size, and the output of this function must be positive"
@@ -34,7 +25,7 @@ inputs_and_answers = {
 }
 
 def main(population):
-    for i in range(100):
+    for i in range(1000):
         for input_value in inputs_and_answers:
             population.set_inputs(inputs_and_answers[input_value][0])
             population.run_simulation()
@@ -44,6 +35,7 @@ def main(population):
         population.mutate()
 
         population.draw_fittest_network()
+        # print(population.get_best_individual_layers())
         time.sleep(0.1)
 
 my_population = Population(
@@ -57,7 +49,8 @@ my_population = Population(
     mutate_probs={
         "connection_weight": 0.8,
         "add_connection": 0.05, 
-        "add_node": 0.0005,
+        # "add_node": 0.0005,
+        "add_node": 0.01,
         "connection_state": 0.01,
         "node_state": 0.01
     }, 

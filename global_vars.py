@@ -3,8 +3,8 @@ from threading import Lock
 running = True
 running_lock = Lock()
 
-counter = 0
-counter_lock = Lock()
+# counter = 0
+# counter_lock = Lock()
 
 network = [
     {'1': [1, 2], '2': [5], '3': [4], '4': [3]}, 

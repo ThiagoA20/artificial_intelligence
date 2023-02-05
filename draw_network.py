@@ -100,7 +100,7 @@ def draw_connection(position1, position2, color=""):
         pygame.draw.line(screen, (150, 150, 150), position1, position2)
 
 
-def draw_network(layers: dict, connections: dict, neurons: dict, draw_canvas=False):
+def draw_network(layers: dict, connections: dict, neurons: dict, draw_canvas=False, show_disabled=True):
     global screen, font
     start_x = 340
     start_y = 60
@@ -132,13 +132,19 @@ def draw_network(layers: dict, connections: dict, neurons: dict, draw_canvas=Fal
         connection_ids = tuple(connection.split('|'))
         n1_pos = neurons[connection_ids[0]][1]
         n2_pos = neurons[connection_ids[1]][1]
-        if connections[connection][0]:
-            color = "gray"
-            connection_weight = Label(font, f"{round(connections[connection][1], 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
-            connection_weight.draw()
+        if show_disabled:
+            if connections[connection][0]:
+                color = "gray"
+                connection_weight = Label(font, f"{round(connections[connection][1], 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
+                connection_weight.draw()
+            else:
+                color = "red"
+            draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]), color)
         else:
-            color = "red"
-        draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]), color)
+            if connections[connection][0]:
+                connection_weight = Label(font, f"{round(connections[connection][1], 3)}", (150, 150, 150), ((n1_pos[0] + n2_pos[0])/2, (n1_pos[1] + n2_pos[1])/2))
+                connection_weight.draw()
+                draw_connection((n1_pos[0] + n_radius, n1_pos[1]), (n2_pos[0] - n_radius, n2_pos[1]))
     
     # Draw neurons, neuron ids and output
     for neuron in neurons:
@@ -209,10 +215,6 @@ def brain_analyser():
                 with global_vars.running_lock:
                     global_vars.running = False
         screen.fill(GRAY_BACKGROUND)
-
-        with global_vars.counter_lock:
-            counter_label = Label(font, f"Counter: {global_vars.counter}", (150, 150, 150), (1030, 30))
-            counter_label.draw()
         
         with global_vars.network_lock:
             network = global_vars.network

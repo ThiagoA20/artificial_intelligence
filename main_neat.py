@@ -247,24 +247,58 @@ class Brain:
         neuron_numbers = [(neuron.get_id(), neuron.get_type()) for neuron in self.__neuron_list]
         logger.debug(f"Neuron numbers/type: {neuron_numbers}")
     
-    def set_layers(self, draw=False): 
-        layers = {}
-        connection_ids_list = []
-        for connection in self.__connection_list:
-            connection_ids = connection.get_ids()
-            connection_ids_list.append(connection_ids)
-            if not str(connection_ids[0]) in layers:
-                layers[str(connection_ids[0])] = 1
-            if not str(connection_ids[1]) in layers:
-                layers[str(connection_ids[1])] = layers[str(connection_ids[0])] + 1
-            else:
-                layers[str(connection_ids[1])] = max(layers[str(connection_ids[0])] + 1, layers[str(connection_ids[1])])
-        for neuron in self.__neuron_list:
-            neuron_id = str(neuron.get_id())
-            if not neuron_id == '0':
-                neuron.set_layer(layers[neuron_id])
+    def set_layers(self, draw=False):
+        neuron_list = [self.__neuron_list[neuron].get_id() for neuron in range(1, len(self.__neuron_list))]
+        connection_list = [connection.get_ids() for connection in self.__connection_list]
+
+        n_position_list = {}
+        n_connection_list = {}
+
+        for neuron in neuron_list:
+            n_connection_list[str(neuron)] = []
+
+        for connection in connection_list:
+            n_connection_list[str(connection[0])].append(connection[1])
+        
+        camada_counter = 1
+        camada_atual = []
+        while len(n_position_list) < len(neuron_list):
+            not_found = []
+            found = []
+            for neuron in n_connection_list:
+                if int(neuron) not in camada_atual:
+                    for n_num in n_connection_list[neuron]:
+                        if n_num not in found:
+                            found.append(n_num)
+            for neuron in neuron_list:
+                if str(neuron) not in n_position_list and neuron not in found:
+                    not_found.append(neuron)
+            for neuron in not_found:
+                n_position_list[str(neuron)] = camada_counter
+                camada_atual.append(neuron)
+            camada_counter += 1
+        
+        for neuron in n_position_list:
+            self.__neuron_list[int(neuron)].set_layer(n_position_list[neuron])
+        
         if self.__layers == {} or draw:
             self.get_layers()
+
+        # layers = {}
+        # connection_ids_list = []
+        # for connection in self.__connection_list:
+        #     connection_ids = connection.get_ids()
+        #     connection_ids_list.append(connection_ids)
+        #     if not str(connection_ids[0]) in layers:
+        #         layers[str(connection_ids[0])] = 1
+        #     if not str(connection_ids[1]) in layers:
+        #         layers[str(connection_ids[1])] = layers[str(connection_ids[0])] + 1
+        #     else:
+        #         layers[str(connection_ids[1])] = max(layers[str(connection_ids[0])] + 1, layers[str(connection_ids[1])])
+        # for neuron in self.__neuron_list:
+        #     neuron_id = str(neuron.get_id())
+        #     if not neuron_id == '0':
+        #         neuron.set_layer(layers[neuron_id])
     
     def get_layers(self) -> dict:
         layers = {}
@@ -277,17 +311,10 @@ class Brain:
                     layers[neuron_layer].append(neuron_id)
                 else:
                     layers[neuron_layer].append(neuron_id)
-        self.__layers = dict(sorted(layers.items()))
-        return dict(sorted(layers.items()))
+        self.__layers = dict(sorted(layers.items(), key=lambda item: int(item[0])))
+        return dict(sorted(layers.items(), key=lambda item: int(item[0])))
     
     def draw_network(self):
-        """
-        - [ ] Layers --------- neuron numbers
-        - [X] Connections ---- is_active, weight
-        {'1|4': [False, 3.251], '1|5': [True, 5.123], '5|4': [True, 2.152], '2|4': [True, 1.321], '4|3': [True, 1.742]
-        - [X] Neurons -------- output
-        {'1': [1], '2': [1], '3': [0], '4': [0], '5': [0]}
-        """
         self.set_layers(draw=True)
 
         network = [
@@ -532,6 +559,9 @@ class Population:
         for individual in self.__indivuduals_list:
             individual.load_inputs(input_list)
     
+    def get_best_individual_layers(self):
+        return self.__indivuduals_list[self.best_individual_id].get_layers()
+
     def run_simulation(self):
         for individual in self.__indivuduals_list:
             individual.run_network()
@@ -724,9 +754,6 @@ class Population:
 
         crossover_count = 0
 
-        # print(f"Individuals: {len(self.__indivuduals_list)}")
-        # print(f"Species: {len(self.__specie_list)}")
-
         for specie in self.__specie_list:
             individuals_info = {}
             for individual in specie.get_info()["individuals"]:
@@ -770,7 +797,6 @@ class Population:
 
                 i += 1
 
-        # print(f"Generation: {self.generation_count}")
         self.__indivuduals_list = new_individuals
         self.generation_count += 1
     
@@ -802,9 +828,9 @@ class Population:
     def load_population(self):
         pass
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
-    logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
+# if __name__ == '__main__':
+#     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
+#     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
 
 """
 O id dos neurônios não importa, por que em esscência, o que estamos buscando é
@@ -818,10 +844,18 @@ Se pensarmos em uma rede neural como uma estrutura que correlaciona fenômenos d
 - [X] Especiação
 - [X] Crossover
 - [X] Mutação
-- [ ] Threads
-- [ ] Ajustar threshold e fitness
+- [X] Threads
 - [ ] Corrigir os bugs
+  - [ ] Mais de uma camada de saída sendo criada
+  - [ ] Fitness incorreto
+  - [ ] Espécies
+  - [ ] Threshold
+  - [ ] Computar apenas conexões e neurônios ativos
+  - [ ] Mutação de adicionar conexões
+  - [ ] Mutação de desativar conexões
+  - [ ] Mutação de desativar neurônios
+  - [ ] Bias
+- [ ] Resolver problema XOR
 - [ ] Testes de performance
-- [ ] Bias
 - [ ] Conexões recorrentes
 """
