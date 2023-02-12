@@ -100,7 +100,7 @@ def draw_connection(position1, position2, color=""):
         pygame.draw.line(screen, (150, 150, 150), position1, position2)
 
 
-def draw_network(layers: dict, connections: dict, neurons: dict, draw_canvas=False, show_disabled=False):
+def draw_network(layers: dict, connections: dict, neurons: dict, draw_canvas=False, show_disabled=True):
     global screen, font
     start_x = 340
     start_y = 60
@@ -164,10 +164,12 @@ def draw_network(layers: dict, connections: dict, neurons: dict, draw_canvas=Fal
 
 def draw_network_info(parameters: dict):
     individuals_label = Label(font, f"Individuals: {parameters['individuals']}", (150, 150, 150), (30, 30))
-    species_label = Label(font, f"Species: {parameters['species']}", (150, 150, 150), (30, 60))
+    species_label = Label(font, f"Species (target=5): {parameters['species']}", (150, 150, 150), (30, 60))
     generation_label = Label(font, f"Generation: {parameters['generation']}", (150, 150, 150), (30, 90))
     best_individual_label = Label(font, f"Best individual: {parameters['best_individual']}", (150, 150, 150), (30, 120))
     fitness_label = Label(font, f"Best Fitness: {parameters['best_fitness']}", (150, 150, 150), (30, 150))
+    threshold = Label(font, f"Threshold: {parameters['threshold']}", (150, 150, 150), (30, 180))
+
     connection_weight_label = Label(font, f"Connection weight prob: {parameters['connection_weight']}%", (150, 150, 150), (30, 390))
     add_connection_label = Label(font, f"Add connection prob: {parameters['add_connection']}%", (150, 150, 150), (30, 420))
     add_node_label = Label(font, f"Add node prob: {parameters['add_node']}%", (150, 150, 150), (30, 450))
@@ -185,6 +187,7 @@ def draw_network_info(parameters: dict):
         generation_label,
         best_individual_label,
         fitness_label,
+        threshold,
         connection_weight_label,
         add_connection_label,
         add_node_label,

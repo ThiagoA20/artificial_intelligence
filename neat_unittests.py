@@ -295,27 +295,6 @@ class BrainTestCase(unittest.TestCase):
     #     self.new_brain.add_connection()
     #     self.assertEqual(len(self.new_brain.get_connection_list()), 13)
 
-    # def test_add_node(self):
-    #     print(self.new_brain.add_node())
-
-# class SpecieTestCase(unittest.TestCase):
-
-#     def test_1(self):
-#         pass
-
-# def my_fitness(output_list: list, answers: list) -> float:
-#     "output list and answers must be the same size, and the output of this function must be positive"
-#     fitness = 0
-#     for i in range(len(output_list)):
-#         if output_list[i] >= 0.5:
-#             result = 1
-#         else:
-#             result = 0
-#     ###################################################################### O problema do fitness ta aqui!
-#         fitness += 1 - (answers[i] - result)
-#         # print(f"Correct answer: {answers[i]} / Output: {result} fitness: {format(fitness, 'f')}")
-#     ###################################################################### O problema do fitness ta aqui!
-#     return 1
 
 class PopulationTestCase(unittest.TestCase):
 
@@ -390,23 +369,80 @@ class PopulationTestCase(unittest.TestCase):
         self.new_population.load_population(individuals_list, 0, 0.0, 0.0, 0)
         result = self.new_population.compare_individuals(0, 1)
         self.assertEqual(result, {'excess': 2, 'disjoint': 1, 'genome_size': 3, 'weight_mean': 2.012})
-        
 
-    # def test_speciation(self):
-    #     for value in self.inputs_and_answers:
-    #         self.new_population.set_inputs(self.inputs_and_answers[value][0])
-    #         self.new_population.run_simulation()
-    #         self.new_population.calculate_fitness(my_fitness, self.inputs_and_answers[value][1])
-    #     self.new_population.save_population('test_fitness')
-    #     fitness_list = self.new_population.get_fitness()
-    #     # print(fitness_list)
-    #     self.new_population.speciation()
-        # print(self.new_population.get_species())
-        # self.new_population.speciation()
-        # print(self.new_population.get_species())
+    def test_speciation(self):
+        for value in self.inputs_and_answers:
+            self.new_population.set_inputs(self.inputs_and_answers[value][0])
+            self.new_population.run_simulation()
+            self.new_population.calculate_fitness(my_fitness, self.inputs_and_answers[value][1])
+        self.new_population.save_population('test_fitness')
+        self.new_population.speciation()
+        self.assertEqual(len(self.new_population.get_species()), 1)
+        self.new_population.load_population(self.individuals_list, 0, 0.0, 0.0, 0, threshold=0.5)
+        self.new_population.speciation()
+        self.assertGreater(len(self.new_population.get_species()), 1)
+    
+    def test_set_best_individual(self):
+        for value in self.inputs_and_answers:
+            self.new_population.set_inputs(self.inputs_and_answers[value][0])
+            self.new_population.run_simulation()
+            self.new_population.calculate_fitness(my_fitness, self.inputs_and_answers[value][1])
+        self.new_population.set_best_individual()
+        self.assertEqual(self.new_population.get_best_individual_info(), [4, 2.3970670000000003])
+
+class PopulationTestCase2(unittest.TestCase):
+    def setUp(self) -> None:
+        self.brain_settings={
+            "INPUTS": 2,
+            "HIDDEN": 0,
+            "OUTPUTS": 1,
+            "CONNECTIONS": 100
+        }
+        self.new_population = Population(10, self.brain_settings, {}, False, False)
+        self.individuals_list = [
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 2.134), Connection(2, 2, 3, 1.145)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 0.122), Connection(2, 2, 3, 1.197)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 1.314), Connection(2, 2, 3, 3.228)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 2.595), Connection(2, 2, 3, 0.733)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 3.157), Connection(2, 2, 3, 2.665)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 0.044), Connection(2, 2, 3, 2.227)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 0.198), Connection(2, 2, 3, 1.742)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 0.742), Connection(2, 2, 3, 0.178)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 1.967), Connection(2, 2, 3, 3.982)]),
+            Brain(2, 0, 1, 100, connection_list=[Connection(1, 1, 3, 0.435), Connection(2, 2, 3, 0.994)])
+        ]
+        self.new_population.load_population(self.individuals_list, 0, 0.0, 0.0, 0)
+        self.inputs_and_answers = {
+            "IP1": [[0, 0], [0]],
+            "IP2": [[1, 0], [1]],
+            "IP3": [[0, 1], [1]],
+            "IP4": [[1, 1], [0]]
+        }
+    
+    def test_ajusted_fitness(self):
+        pass
+
+    def test_population_fitness(self):
+        pass
+
+    def test_calculate_offspring(self):
+        pass
+
+    def test_pick_one(self):
+        pass
 
     def test_crossover(self):
         pass
+        # for value in self.inputs_and_answers:
+        #     self.new_population.set_inputs(self.inputs_and_answers[value][0])
+        #     self.new_population.run_simulation()
+        #     self.new_population.calculate_fitness(my_fitness, self.inputs_and_answers[value][1])
+        # self.new_population.speciation()
+        # total_offspring = 0
+        # for specie in self.new_population.get_species_objects():
+        #     total_offspring += int(specie.get_offspring())
+        # self.assertEqual(total_offspring, self.new_population.get_info()['popsize'])
+        # self.new_population.crossover()
 
     def test_mutate_change_weights(self):
         pass
