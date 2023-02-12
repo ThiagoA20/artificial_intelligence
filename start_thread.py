@@ -9,12 +9,15 @@ def my_fitness(output_list: list, answers: list) -> float:
     "output list and answers must be the same size, and the output of this function must be positive"
     fitness = 0
     for i in range(len(output_list)):
-        if answers[i] >= 0.5:
-            answer = 1
+        if output_list[i] >= 0.5:
+            result = 1
         else:
-            answer = 0
-        fitness += 1 - abs(output_list[i] - answer)
-    return fitness
+            result = 0
+    ###################################################################### O problema do fitness ta aqui!
+        fitness += 1 - (answers[i] - result)
+        # print(f"Correct answer: {answers[i]} / Output: {result} fitness: {format(fitness, 'f')}")
+    ###################################################################### O problema do fitness ta aqui!
+    return 1
 
 
 inputs_and_answers = {
@@ -25,18 +28,28 @@ inputs_and_answers = {
 }
 
 def main(population):
-    for i in range(1000):
+    for i in range(2):
         for input_value in inputs_and_answers:
+            # print(f"before inputs: {population.max_fitness}")
             population.set_inputs(inputs_and_answers[input_value][0])
+            # print(f"before run: {population.max_fitness}")
             population.run_simulation()
+            # print(f"before calculate fitness: {population.max_fitness}")
             population.calculate_fitness(my_fitness, inputs_and_answers[input_value][1])
+            # print(f"after calculate fitness: {population.max_fitness}")
+        # print(f"before speciation: {population.max_fitness}")
         population.speciation()
+        # print(f"Speciation: {population.pop_fitness}")
+        # print(f"before crossover: {population.max_fitness}")
         population.crossover()
+        # print(f"before mutate: {population.max_fitness}")
         population.mutate()
+        # print(f"after mutate: {population.max_fitness}")
+        print("end population")
 
         population.draw_fittest_network()
         # print(population.get_best_individual_layers())
-        time.sleep(0.1)
+        time.sleep(3)
 
 my_population = Population(
     popsize=50, 
@@ -49,11 +62,11 @@ my_population = Population(
     mutate_probs={
         "connection_weight": 0.8,
         "add_connection": 0.05, 
-        # "add_node": 0.0005,
-        "add_node": 0.01,
+        "add_node": 0.0005,
+        # "add_node": 0.01,
         "connection_state": 0.01,
         "node_state": 0.01
-    }, 
+    },
     allow_bias=False, 
     allow_recurrency=False
 )

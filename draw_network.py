@@ -100,7 +100,7 @@ def draw_connection(position1, position2, color=""):
         pygame.draw.line(screen, (150, 150, 150), position1, position2)
 
 
-def draw_network(layers: dict, connections: dict, neurons: dict, draw_canvas=False, show_disabled=True):
+def draw_network(layers: dict, connections: dict, neurons: dict, draw_canvas=False, show_disabled=False):
     global screen, font
     start_x = 340
     start_y = 60
