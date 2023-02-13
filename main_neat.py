@@ -284,26 +284,6 @@ class Brain:
         
         if self.__layers == {} or draw:
             self.get_layers()
-
-        #################################
-
-        # layers = {}
-        # connection_ids_list = []
-        # for connection in self.__connection_list:
-        #     connection_ids = connection.get_ids()
-        #     connection_ids_list.append(connection_ids)
-        #     if not str(connection_ids[0]) in layers:
-        #         layers[str(connection_ids[0])] = 1
-        #     if not str(connection_ids[1]) in layers:
-        #         layers[str(connection_ids[1])] = layers[str(connection_ids[0])] + 1
-        #     else:
-        #         layers[str(connection_ids[1])] = max(layers[str(connection_ids[0])] + 1, layers[str(connection_ids[1])])
-        # for neuron in self.__neuron_list:
-        #     neuron_id = str(neuron.get_id())
-        #     if not neuron_id == '0':
-        #         neuron.set_layer(layers[neuron_id])
-
-        #################################
     
     def get_layers(self) -> dict:
         layers = {}
@@ -390,14 +370,15 @@ class Brain:
 
     def mutate_connection_weights(self, prob):
         for connection in self.__connection_list:
-            get_prob = random.uniform(0.0, 1.0)
-            if get_prob <= prob:
-                update_value = random.uniform(0.0, 1.0)
-                if update_value <= 0.9:
-                    previous_weight = connection.get_weight()
-                    connection.set_weight(random.uniform(previous_weight * 0.8, previous_weight * 1.2))
-                else:
-                    connection.set_weight(random.uniform(-20, 20))
+            if connection.is_active():
+                get_prob = random.uniform(0.0, 1.0)
+                if get_prob <= prob:
+                    update_value = random.uniform(0.0, 1.0)
+                    if update_value <= 0.9:
+                        previous_weight = connection.get_weight()
+                        connection.set_weight(random.uniform(previous_weight * 0.8, previous_weight * 1.2))
+                    else:
+                        connection.set_weight(random.uniform(-20, 20))
 
     def mutate_connection_state(self, prob):
         for connection in self.__connection_list:
@@ -439,30 +420,45 @@ class Brain:
         self.set_layers()
         new_connection = None
         attempts = 10
-        while new_connection == None or attempts > 0:
+        while new_connection == None and attempts > 0:
+            ##############################################
+            ##############################################
             valid_n1_set = []
             for i in range(len(self.__neuron_list)):
                 if i >= 1 and i <= self.__input_neurons or i > self.__input_neurons + self.__output_neurons:
                     valid_n1_set.append(i)
-            n1 = valid_n1_set[random.randint(0, len(valid_n1_set) - 1)]
-            n1_layer = self.__neuron_list[n1].get_layer()
-            valid_n2_set = []
-            for camada in range(n1_layer, len(self.__layers)): ########################## Talvez seja necessário adicionar +1 na camada para que não crie uma conexão recorrente
-                for neuron in list(self.__layers.values())[camada]:
-                    valid_n2_set.append(neuron)
-            n2 = valid_n2_set[random.randint(0, len(valid_n2_set) - 1)]
-            connection_exists = False
-            for connection in self.__connection_list:
-                if connection.get_ids() == (n1, n2):
-                    connection_exists = True
-                    break
-            if not connection_exists:
-                if f"{n1}|{n2}" not in GENOME_HASHTABLE:
-                    INNOVATION_NUM += 1
-                    GENOME_HASHTABLE[f"{n1}|{n2}"] = INNOVATION_NUM
-                    new_connection = Connection(GENOME_HASHTABLE[f"{n1}|{n2}"], n1, n2, random.uniform(-20, 20), True)
-                else:
-                    new_connection = Connection(GENOME_HASHTABLE[f"{n1}|{n2}"], n1, n2, random.uniform(-20, 20), True)
+            if len(valid_n1_set) >= 1:
+                n1 = valid_n1_set[random.randint(0, len(valid_n1_set) - 1)]
+                n1_layer = self.__neuron_list[n1].get_layer()
+                ##############################################
+                ##############################################
+                valid_n2_set = []
+                for camada in range(n1_layer, len(self.__layers)): ######## Talvez seja necessário adicionar +1 na camada para que não crie uma conexão recorrente
+                    for neuron in list(self.__layers.values())[camada]:
+                        valid_n2_set.append(neuron)
+                if len(valid_n2_set) >= 1:
+                    if len(valid_n2_set) == 1:
+                        n2 = valid_n2_set[0]
+                    else:
+                        n2 = valid_n2_set[random.randint(0, len(valid_n2_set) - 1)]
+                    ##############################################
+                    ##############################################
+                    connection_exists = False
+                    for connection in self.__connection_list:
+                        if connection.get_ids() == (n1, n2):
+                            connection_exists = True
+                            break
+                    ##############################################
+                    ##############################################
+                    if not connection_exists:
+                        if f"{n1}|{n2}" not in GENOME_HASHTABLE:
+                            INNOVATION_NUM += 1
+                            GENOME_HASHTABLE[f"{n1}|{n2}"] = INNOVATION_NUM
+                            new_connection = Connection(GENOME_HASHTABLE[f"{n1}|{n2}"], n1, n2, random.uniform(-20, 20), True)
+                        else:
+                            new_connection = Connection(GENOME_HASHTABLE[f"{n1}|{n2}"], n1, n2, random.uniform(-20, 20), True)
+                    ##############################################
+                    ##############################################
             attempts -= 1
         if new_connection != None:
             self.__connection_list.append(new_connection)
@@ -668,37 +664,43 @@ class Population:
     
     def compare_individuals(self, individual_num: int, nay_individual: int) -> object:
         """
-        Retorna objeto contendo o número de disjoint, excess, média dos pesos das conexões em comum e o tamanho do genoma do parente maior. Obs: apenas as conexões ativas são levadas em consideração, pois elas são mais relevantes.
+        Returns an object with the number of disjoint, excess, weight mean of the common connections and the genome size of the biggest parent. Only active connections are taken into account, because the are more important.
         """
         result = {"excess": 0, "disjoint": 0, "genome_size": 0, "weight_mean": 0}
         connections1 = self.__indivuduals_list[individual_num].get_connection_list()
         c1_innovation = {connection.get_innovation_num(): connection.get_weight() for connection in connections1 if connection.is_active()}
         connections2 = self.__indivuduals_list[nay_individual].get_connection_list()
         c2_innovation = {connection.get_innovation_num(): connection.get_weight() for connection in connections2 if connection.is_active()}
-        max_c1 = max(c1_innovation.keys())
-        max_c2 = max(c2_innovation.keys())
-        common = []
-        disjoint = {}
-        excess = {}
-        for connection in c1_innovation:
-            if connection in c2_innovation:
-                common.append(abs(c1_innovation[connection] - c2_innovation[connection]))
+        if len(c1_innovation) == 0 or len(c2_innovation) == 0:
+            return {"excess": 1, "disjoint": 1, "genome_size": 1, "weight_mean": 1}
+        else:
+            max_c1 = max(c1_innovation.keys())
+            max_c2 = max(c2_innovation.keys())
+            common = []
+            disjoint = {}
+            excess = {}
+            for connection in c1_innovation:
+                if connection in c2_innovation:
+                    common.append(abs(c1_innovation[connection] - c2_innovation[connection]))
+                else:
+                    if connection < max_c2:
+                        disjoint[connection] = c1_innovation[connection]
+                    else:
+                        excess[connection] = c1_innovation[connection]
+            for connection in c2_innovation:
+                if connection not in c1_innovation:
+                    if connection < max_c1:
+                        disjoint[connection] = c2_innovation[connection]
+                    else:
+                        excess[connection] = c2_innovation[connection]
+            result["excess"] = len(excess)
+            result["disjoint"] = len(disjoint)
+            result["genome_size"] = max(len(c1_innovation), len(c2_innovation))
+            if len(common) == 0:
+                result["weight_mean"] = 1.0
             else:
-                if connection < max_c2:
-                    disjoint[connection] = c1_innovation[connection]
-                else:
-                    excess[connection] = c1_innovation[connection]
-        for connection in c2_innovation:
-            if connection not in c1_innovation:
-                if connection < max_c1:
-                    disjoint[connection] = c2_innovation[connection]
-                else:
-                    excess[connection] = c2_innovation[connection]
-        result["excess"] = len(excess)
-        result["disjoint"] = len(disjoint)
-        result["genome_size"] = max(len(c1_innovation), len(c2_innovation))
-        result["weight_mean"] = sum(common) / (len(common) + 1)
-        return result
+                result["weight_mean"] = sum(common) / len(common)
+            return result
 
     def calculate_ajusted_fitness(self) -> None:
         """Set the specie fitness and update the generations_since_improved"""
@@ -730,14 +732,14 @@ class Population:
     def set_offspring(self) -> None:
         for specie in self.__specie_list:
             specie_info = specie.get_info()
-            if specie_info["gens_since_improved"] >= 15:
+            if specie_info["gens_since_improved"] >= 15 and self.__best_individual_id not in specie_info["individuals"]:
                 specie.set_offspring(0)
             else:
                 specie.set_offspring((specie_info["fitness"] / self.pop_fitness) * len(specie_info["individuals"]))
     
     def update_threshold(self) -> None:
         """
-        enquanto o número de espécies for menor que o alvo, o threshold vai diminuir, se for maior ele vai começar a aumentar. No artigo a variação é de 0.3, mas 0.5 também funciona bem.
+        Whike the number of species are lower than the threshold, it's value will decrease every generation in function of the threshold_change_ration, but if the number of species is greater, then it will increase.
         """
         num_species = len(self.__specie_list)
         if num_species < self.__species_target:
@@ -799,7 +801,7 @@ class Population:
                 choosen_one = specie.get_individuals_list()[0]
                 for nay_individual in not_assigned_yet:
                     result = self.compare_individuals(choosen_one, nay_individual)
-                    CD = (result["excess"] / result["genome_size"]) + (result["disjoint"] / result["genome_size"]) + result["weight_mean"]
+                    CD = c1 * (result["excess"] / result["genome_size"]) + c2 * (result["disjoint"] / result["genome_size"]) + c3 * result["weight_mean"]
                     if CD <= self.__threshold:
                         specie.add_individual(nay_individual)
                         species_assigned.append(nay_individual)
@@ -818,7 +820,7 @@ class Population:
                 for nay_individual in not_assigned_yet:
                     if not nay_individual == individual_num:
                         result = self.compare_individuals(individual_num, nay_individual)
-                        CD = (result["excess"] / result["genome_size"]) + (result["disjoint"] / result["genome_size"]) + result["weight_mean"]
+                        CD = c1 * (result["excess"] / result["genome_size"]) + c2 * (result["disjoint"] / result["genome_size"]) + c3 * result["weight_mean"]
                         if CD <= self.__threshold:
                             new_specie.add_individual(nay_individual)
                             species_assigned.append(nay_individual)
@@ -940,25 +942,20 @@ class Population:
     
     def mutate(self):
         for individual in self.__indivuduals_list:
-            individual.mutate_connection_weights(self.__mutate_probs["connection_weight"])
+            if individual.get_fitness() < self.__max_fitness:
+                individual.mutate_connection_weights(self.__mutate_probs["connection_weight"])
 
-            # add_connection_prob = random.uniform(0.0, 1.0)
-            # if add_connection_prob <= self.__mutate_probs["add_connection"]:
-            #     individual.add_connection(self.__allow_recurrency)
-            
-            add_node_prob = random.uniform(0.0, 1.0)
-            if add_node_prob <= self.__mutate_probs["add_node"]:
-                individual.add_node()
-            
-            # individual.mutate_connection_state(self.__mutate_probs["connection_state"])
+                add_connection_prob = random.uniform(0.0, 1.0)
+                if add_connection_prob <= self.__mutate_probs["add_connection"]:
+                    individual.add_connection(self.__allow_recurrency)
+                
+                add_node_prob = random.uniform(0.0, 1.0)
+                if add_node_prob <= self.__mutate_probs["add_node"]:
+                    individual.add_node()
+                
+                individual.mutate_connection_state(self.__mutate_probs["connection_state"])
 
-            # individual.mutate_node_state(self.__mutate_probs["node_state"])
-
-#     def get_best_individual_species(self) -> list[Brain]:
-#         pass
-
-#     def get_best_individual_population(self) -> Brain:
-#         pass
+                individual.mutate_node_state(self.__mutate_probs["node_state"])
 
 # if __name__ == '__main__':
 #     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -985,14 +982,16 @@ Se pensarmos em uma rede neural como uma estrutura que correlaciona fenômenos d
 - [X] Threads
 - [ ] Corrigir os bugs
   - [X] Mais de uma camada de saída sendo criada
-  - [ ] Mutação de adicionar conexões
+  - [X] Mutação de adicionar conexões
   - [X] Fitness incorreto
   - [X] Espécies
-  - [ ] Threshold
-  - [ ] Computar apenas conexões e neurônios ativos
-  - [ ] Mutação de desativar conexões
-  - [ ] Mutação de desativar neurônios
-  - [ ] Bias
+  - [X] Threshold
+  - [X] Computar apenas conexões e neurônios ativos
+  - [X] Mutação de desativar conexões
+  - [X] Mutação de desativar neurônios
+  - [ ] Conservar a melhor rede encontrada até o momento
+  - [ ] Estabilizar threshold
+- [ ] Bias
 - [ ] Resolver problema XOR
 - [ ] Testes de performance
 - [ ] Conexões recorrentes

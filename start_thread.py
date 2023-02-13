@@ -43,13 +43,15 @@ my_population = Population(
     mutate_probs={
         "connection_weight": 0.8,
         "add_connection": 0.05, 
-        "add_node": 0.05,
+        "add_node": 0.1,
         # "add_node": 0.01,
         "connection_state": 0.01,
         "node_state": 0.01
     },
     allow_bias=False, 
-    allow_recurrency=False
+    allow_recurrency=False,
+    threshold=6.0,
+    threshold_change_ratio=0.3
 )
 
 brain_analyser_thread = threading.Thread(target=brain_analyser)
