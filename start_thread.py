@@ -20,7 +20,7 @@ inputs_and_answers = {
 }
 
 def main(population):
-    for i in range(1000):
+    for i in range(10000):
         for input_value in inputs_and_answers:
             population.set_inputs(inputs_and_answers[input_value][0])
             population.run_simulation()
@@ -30,10 +30,10 @@ def main(population):
         population.mutate()
 
         population.draw_fittest_network()
-        time.sleep(0.1)
+        # time.sleep(0.1)
 
 my_population = Population(
-    popsize=10, 
+    popsize=100, 
     brain_settings={
         "INPUTS": 2,
         "HIDDEN": 0,
@@ -42,10 +42,9 @@ my_population = Population(
     }, 
     mutate_probs={
         "connection_weight": 0.8,
-        "add_connection": 0.05, 
+        "add_connection": 0.05,
         "add_node": 0.1,
-        # "add_node": 0.01,
-        "connection_state": 0.01,
+        "connection_state": 0.1,
         "node_state": 0.01
     },
     allow_bias=False, 

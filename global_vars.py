@@ -20,6 +20,7 @@ network_info = {
     "best_individual": 12,
     "best_fitness": 4.32,
     "threshold": 100.0,
+    "best_specie": 0,
     "connection_weight": 80,
     "add_connection": 0.5,
     "add_node": 0.01,
