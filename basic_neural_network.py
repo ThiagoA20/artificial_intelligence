@@ -65,15 +65,8 @@ class NeuralNetwork:
     
     def get_fitness(self) -> float:
         return self.fitness
-
+    
     def forward(self, input_values: tuple[float]) -> list[float]:
-        """
-        Função de propagação que calcula as saídas dos neurônios, recebe duas entradas correspondentes aos dois neurônios
-        4 conexões da camada de entrada com a camada oculta | formato: [[1, 1], [1, 1]]
-        - a propagação da primeira camada para a segunda gera 3 saídas.
-        3 conexões da camada oculta com a camada de saída   | formato: [[1, 1, 1]]        
-        - a propagação da segunda para a terceira camada gera 1 saída.
-        """
         h1 = [
             sigmoid(input_values[0] * self.weights1[0][0]),
             sigmoid(sum([input_values[0] * self.weights1[0][1], input_values[1] * self.weights1[1][0]])),
