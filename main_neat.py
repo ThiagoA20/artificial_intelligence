@@ -109,7 +109,7 @@ class Connection:
     def get_ids(self) -> tuple:
         return (self.__in_neuron, self.__out_neuron)
 
-    def set_weight(self, weight: float):
+    def set_weight(self, weight: float) -> None:
         if not isinstance(weight, float):
             raise TypeError("The weight must be a float number!")
         self.__weight = weight
@@ -349,7 +349,7 @@ class Brain:
     def get_fitness(self) -> float:
         return self.__fitness
     
-    def set_specie(self, specie_num):
+    def set_specie(self, specie_num) -> None:
         self.__specie_num = specie_num
     
     def get_specie(self) -> int:
@@ -501,10 +501,10 @@ class Specie:
     def get_info(self) -> dict:
         return {"id": self.id, "individuals": self.individuals, "fitness": self.fitness, "gens_since_improved": self.gens_since_improved, "max_fitness": self.max_fitness}
     
-    def set_max_fitness(self, max_fitness):
+    def set_max_fitness(self, max_fitness: float) -> None:
         self.max_fitness = max_fitness
     
-    def get_max_fitness(self):
+    def get_max_fitness(self) -> float:
         return self.max_fitness
     
     def add_individual(self, individual_num: int) -> None:
@@ -554,6 +554,7 @@ class Population:
         self.__max_fitness = 0
         self.__best_individual_id = 0
         self.__best_specie = 1
+        self.__output_list = {}
     
     def get_info(self) -> dict:
         return {
@@ -661,6 +662,11 @@ class Population:
         with global_vars.network_info_lock:
             global_vars.network_info = network_info
     
+    def update_results(self, entradas: list[float]):
+        output_list = self.__indivuduals_list[self.__best_individual_id].get_outputs()
+        self.__output_list[f"[{', '.join(entradas)}]"] = output_list
+        # update global_vars and draw_network
+
     def compare_individuals(self, individual_num: int, nay_individual: int) -> object:
         """
         Returns an object with the number of disjoint, excess, weight mean of the common connections and the genome size of the biggest parent. Only active connections are taken into account, because the are more important.
@@ -712,15 +718,6 @@ class Population:
                 specie_fitness += ajusted_fitness
             specie_fitness = specie_fitness / len(individuals_list)
             specie.set_fitness(specie_fitness)
-            # if self.__generation_count == 0:
-                # specie.set_fitness(specie_fitness)
-            # else:
-                # if specie_fitness > specie.get_max_fitness():
-                    # specie.erase_generation()
-                    # specie.set_fitness(specie_fitness)
-                # else:
-                    # specie.increment_generation()
-                    # specie.set_fitness(specie_fitness)
     
     def calculate_pop_fitness(self) -> None:
         species_values = []
@@ -736,7 +733,6 @@ class Population:
                 specie.set_offspring(0)
             else:
                 specie.set_offspring((specie_info["fitness"] / self.pop_fitness) * len(specie_info["individuals"]))
-            # print(f"{specie.get_info()['id']} : {specie.get_info()['gens_since_improved']} : {specie.get_offspring()}")
     
     def update_threshold(self) -> None:
         """
@@ -748,7 +744,7 @@ class Population:
         elif num_species > self.__species_target:
             self.__threshold += self.__threshold_change_ratio
     
-    def set_species_max_fitness(self):
+    def set_species_max_fitness(self) -> None:
         for specie in self.__specie_list:
             individuals_info = {}
             for individual in specie.get_info()["individuals"]:
@@ -865,7 +861,7 @@ class Population:
     def get_species_objects(self) -> list[Specie]:
         return self.__specie_list
 
-    def pickOne(self, individuals_info: dict, sum_fitness: float):
+    def pickOne(self, individuals_info: dict, sum_fitness: float) -> int:
         individual_id = -1
         r = random.uniform(0, sum_fitness)
         list_keys = list(individuals_info.keys())
@@ -875,7 +871,7 @@ class Population:
             r -= list_values[individual_id]
         return list_keys[individual_id]
     
-    def crossover(self):
+    def crossover(self) -> None:
         new_individuals = []
         for i in range(self.__population_size):
             new_individuals.append(Brain(self.__brain_settings["INPUTS"], self.__brain_settings["HIDDEN"], self.__brain_settings["OUTPUTS"], self.__brain_settings["CONNECTIONS"]))
@@ -993,7 +989,7 @@ class Population:
         self.__indivuduals_list = new_individuals
         self.__generation_count += 1
     
-    def mutate(self):
+    def mutate(self) -> None:
         for individual in range(len(self.__indivuduals_list)):
             if individual != self.__best_individual_id:
                 self.__indivuduals_list[individual].mutate_connection_weights(self.__mutate_probs["connection_weight"])
@@ -1006,13 +1002,9 @@ class Population:
                 if add_node_prob <= self.__mutate_probs["add_node"]:
                     self.__indivuduals_list[individual].add_node()
                 
-                self.__indivuduals_list[individual].mutate_connection_state(self.__mutate_probs["connection_state"])
-
                 # self.__indivuduals_list[individual].mutate_node_state(self.__mutate_probs["node_state"])
-
-# if __name__ == '__main__':
-#     logging.basicConfig(level=logging.WARNING, format="%(asctime)s | %(levelname)s | %(message)s")
-#     logger.debug(f"Genome connections hashtable: {GENOME_HASHTABLE}")
+                
+                self.__indivuduals_list[individual].mutate_connection_state(self.__mutate_probs["connection_state"])
 
 def neurons_to_csv(filename):
     pass
@@ -1033,7 +1025,7 @@ Se pensarmos em uma rede neural como uma estrutura que correlaciona fenômenos d
 - [X] Crossover
 - [X] Mutação
 - [X] Threads
-- [ ] Corrigir os bugs
+- [X] Corrigir os bugs
   - [X] Mais de uma camada de saída sendo criada
   - [X] Mutação de adicionar conexões
   - [X] Fitness incorreto
@@ -1043,12 +1035,21 @@ Se pensarmos em uma rede neural como uma estrutura que correlaciona fenômenos d
   - [X] Mutação de desativar conexões
   - [X] Mutação de desativar neurônios
   - [X] Conservar a melhor rede encontrada até o momento
-  - [ ] Estabilizar threshold
+  - [X] Estabilizar threshold
 - [ ] Bias
-- [ ] Resolver problema XOR
+- [X] Resolver problema XOR
+- [ ] Reduzir o tamanho do código e separar as partes aleatórias para otimização futura
 - [ ] Testes de performance
 - [ ] Conexões recorrentes
 - [ ] Começar com 0 conexões entre inputs e outputs
+
+- [ ] Testar a porcentagem das mutações em função do número de espécies e geração
+- [ ] Testar variando a função de ativação utilizada
+- [ ] Testar adicionar/remover conexões/neurônios com base na ativação do neurônio
+- [ ] Adicionar custo de conexão
+- [ ] Testar misturar a codificação direta com a indireta em um único sistema, criando módulos
+- [ ] Testar criar GAN's com NEAT e HyperNEAT
+- [ ] Testar adicionar transformadores
 
 - Fatos interessantes:
 O cérebro humano possui 86 bilhões de neurônios e consome cerca de 500 kcal (2093.4KJ) por dia

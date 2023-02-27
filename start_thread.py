@@ -25,6 +25,7 @@ def main(population):
             population.set_inputs(inputs_and_answers[input_value][0])
             population.run_simulation()
             population.calculate_fitness(my_fitness, inputs_and_answers[input_value][1])
+            # population.update_results(inputs_and_answers[input_value][0])
         population.speciation()
         population.crossover()
         population.mutate()
@@ -43,7 +44,7 @@ my_population = Population(
     mutate_probs={
         "connection_weight": 0.8,
         "add_connection": 0.05,
-        "add_node": 0.1,
+        "add_node": 0.03,
         "connection_state": 0.1,
         "node_state": 0.01
     },
