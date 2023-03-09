@@ -1,6 +1,5 @@
 venv/
 info/
-neat_performance_tests.py
 __pycache__/
 energy/
 tests/

@@ -69,10 +69,12 @@ class Neuron:
     
     def get_sum(self) -> float:
         return self.__sum_input
-    
+
     def activate_neuron(self) -> None:
         if (self.__neuron_type == 1):
             self.__sum_output = self.__sum_input
+        elif (self.__neuron_type == 3):
+            self.__sum_output = 1
         else:
             self.__sum_output = self.__activation(self.__sum_input)
     
@@ -327,6 +329,10 @@ class Brain:
         for i in range(self.__input_neurons+1, self.__input_neurons + self.__output_neurons + 1):
             output_values.append(self.__neuron_list[i].get_output())
         return output_values
+    
+    def execute(self) -> list:
+        self.run_network()
+        return self.get_outputs()
 
     def draw_network(self) -> None:
         self.set_layers(draw=True)
@@ -851,9 +857,12 @@ class Population:
         for specie in self.__specie_list:
             list_species.append(specie.get_info())
         return list_species
-    
+
     def get_best_individual_info(self) -> list:
         return [self.__best_individual_id, self.__indivuduals_list[self.__best_individual_id].get_fitness()]
+    
+    def get_best_individual_object(self) -> Brain:
+        return self.__indivuduals_list[self.__best_individual_id]
     
     def get_best_individual_layers(self) -> dict:
         return self.__indivuduals_list[self.best_individual_id].get_layers()
@@ -873,12 +882,11 @@ class Population:
     
     def crossover(self) -> None:
         new_individuals = []
+
         for i in range(self.__population_size):
             new_individuals.append(Brain(self.__brain_settings["INPUTS"], self.__brain_settings["HIDDEN"], self.__brain_settings["OUTPUTS"], self.__brain_settings["CONNECTIONS"]))
         crossover_count = 0
-
         total_offspring = 1
-
         remaining_offspring = {}
         
         for specie in self.__specie_list:
@@ -886,15 +894,12 @@ class Population:
             for individual in specie.get_info()["individuals"]:
                 individuals_info[f"{individual}"] = self.__indivuduals_list[individual].get_fitness()
             sum_fitness = sum(list(individuals_info.values()))
-            
             specie_offspring = specie.get_offspring()
-
             offspring = int(specie_offspring)
             if f"{self.__best_individual_id}" in individuals_info:
                 offspring -= 1
                 new_individuals[self.__best_individual_id] = deepcopy(self.__indivuduals_list[self.__best_individual_id])
             total_offspring += offspring
-
             remaining_offspring[specie.get_info()['id']] = specie_offspring - offspring
 
             i = 0
@@ -931,7 +936,7 @@ class Population:
 
                     new_individuals[crossover_count].set_connection_weight(common)
                 i += 1
-        # print(crossover_count)
+
         if total_offspring != self.__population_size:
             remaining_individuals = self.__population_size - total_offspring
             sum_remaining_offspring = sum(list(remaining_offspring.values()))
@@ -944,45 +949,42 @@ class Population:
                         for individual in specie.get_info()["individuals"]:
                             individuals_info[f"{individual}"] = self.__indivuduals_list[individual].get_fitness()
                         sum_fitness = sum(list(individuals_info.values()))
-                        
-                        parent1 = self.pickOne(individuals_info, sum_fitness)
-                        parent2 = self.pickOne(individuals_info, sum_fitness)
-                        if individuals_info[f"{parent1}"] > individuals_info[f"{parent2}"]:
-                            # print(f"CC: {crossover_count} | P1: {int(parent1)} | NIL: {len(new_individuals)} | ILL: {len(self.__indivuduals_list)}")
-                            new_individuals[crossover_count] = deepcopy(self.__indivuduals_list[int(parent1)])
-                        elif individuals_info[f"{parent1}"] == individuals_info[f"{parent2}"]:
-                            selected = random.randint(1, 2)
-                            if selected == 1:
-                                # print(f"CC: {crossover_count} | P1: {int(parent1)} | NIL: {len(new_individuals)} | ILL: {len(self.__indivuduals_list)}")
+
+                        if not crossover_count == self.__best_individual_id:
+                            parent1 = self.pickOne(individuals_info, sum_fitness)
+                            parent2 = self.pickOne(individuals_info, sum_fitness)
+                            if individuals_info[f"{parent1}"] > individuals_info[f"{parent2}"]:
                                 new_individuals[crossover_count] = deepcopy(self.__indivuduals_list[int(parent1)])
+                            elif individuals_info[f"{parent1}"] == individuals_info[f"{parent2}"]:
+                                selected = random.randint(1, 2)
+                                if selected == 1:
+                                    new_individuals[crossover_count] = deepcopy(self.__indivuduals_list[int(parent1)])
+                                else:
+
+                                    new_individuals[crossover_count] = deepcopy(self.__indivuduals_list[int(parent2)])
                             else:
-                                # print(f"CC: {crossover_count} | P1: {int(parent2)} | NIL: {len(new_individuals)} | ILL: {len(self.__indivuduals_list)}")
                                 new_individuals[crossover_count] = deepcopy(self.__indivuduals_list[int(parent2)])
-                        else:
-                            # print(f"CC: {crossover_count} | P1: {int(parent2)} | NIL: {len(new_individuals)} | ILL: {len(self.__indivuduals_list)}")
-                            new_individuals[crossover_count] = deepcopy(self.__indivuduals_list[int(parent2)])
-                        
-                        p1_connections = self.__indivuduals_list[int(parent1)].get_connection_list()
-                        c1_values = {f"{connection.get_ids()[0]}|{connection.get_ids()[1]}": connection.get_weight() for connection in p1_connections}
-                        p2_connections = self.__indivuduals_list[int(parent2)].get_connection_list()
-                        c2_values = {f"{connection.get_ids()[0]}|{connection.get_ids()[1]}": connection.get_weight() for connection in p2_connections}
+                            
+                            p1_connections = self.__indivuduals_list[int(parent1)].get_connection_list()
+                            c1_values = {f"{connection.get_ids()[0]}|{connection.get_ids()[1]}": connection.get_weight() for connection in p1_connections}
+                            p2_connections = self.__indivuduals_list[int(parent2)].get_connection_list()
+                            c2_values = {f"{connection.get_ids()[0]}|{connection.get_ids()[1]}": connection.get_weight() for connection in p2_connections}
 
-                        c1_common = {connection: c1_values[connection] for connection in c1_values if connection in c2_values}
-                        c2_common = {connection: c2_values[connection] for connection in c2_values if connection in c1_values}
-                        common = {}
-                        for connection in c1_common:
-                            selected_weight = random.randint(1, 2)
-                            if selected_weight == 1:
-                                common[connection] = c1_common[connection]
-                            else:
-                                common[connection] = c2_common[connection]
+                            c1_common = {connection: c1_values[connection] for connection in c1_values if connection in c2_values}
+                            c2_common = {connection: c2_values[connection] for connection in c2_values if connection in c1_values}
+                            common = {}
+                            for connection in c1_common:
+                                selected_weight = random.randint(1, 2)
+                                if selected_weight == 1:
+                                    common[connection] = c1_common[connection]
+                                else:
+                                    common[connection] = c2_common[connection]
 
-                        new_individuals[crossover_count].set_connection_weight(common)
-                
+                            new_individuals[crossover_count].set_connection_weight(common)
+
                 crossover_count += 1
                 remaining_individuals -= 1
                 total_offspring += 1
-        
         for individual in new_individuals:
             individual.reset_fitness()
 
@@ -990,8 +992,9 @@ class Population:
         self.__generation_count += 1
     
     def mutate(self) -> None:
+        best_individual = self.__best_individual_id
         for individual in range(len(self.__indivuduals_list)):
-            if individual != self.__best_individual_id:
+            if individual != best_individual:
                 self.__indivuduals_list[individual].mutate_connection_weights(self.__mutate_probs["connection_weight"])
 
                 add_connection_prob = random.uniform(0.0, 1.0)
@@ -1013,6 +1016,37 @@ def connections_to_csv(filename):
     pass
 
 """
+Geradores
+List Comprehension
+
+Fazer simulações de 200 gerações cada, plotar o gráfico do score do melhor indivíduo da população
+O gráfico vai de 0 a 4 na vertical.
+Comparar o gráfico de evolução de 100 simulações, fazer a média.
+Fazer o mesmo utilizando o problema da soma de dois números
+
+Adicionar o bias na equação
+Repetir os testes e comparar os gráficos
+
+Adicionar conexões recorrentes na equação
+Repetir os testes e comparar os gráficos
+
+import time
+
+def fib_list(max):
+    nums = []
+    a, b = 0, 1
+    while len(nums) < max:
+    nums.append(b)
+    a, b = b, a + b
+    return nums
+
+def fib_gen(max):
+    a, b, contador = 0, 1, 0
+    while contador < max:
+    a, b = b, a + b
+    yield a
+    contador += 1
+---
 O id dos neurônios não importa, por que em esscência, o que estamos buscando é
 a informação da melhor composição da rede e essa informação já está nas conexões,
 um neurônio pode mudar de posição, mas o que importa é saber se deve haver um novo
